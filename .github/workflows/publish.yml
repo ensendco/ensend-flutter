@@ -1,0 +1,81 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    branches: [main]
+
+# OIDC token required for pub.dev's automated publishing.
+# The repository must be registered as an automated publisher on pub.dev
+# (Pub.dev → package page → Admin → Automated publishing → GitHub Actions).
+permissions:
+  id-token: write  # for pub.dev OIDC token exchange
+  contents: read
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Analyze
+        run: dart analyze --fatal-infos
+
+      - name: Run tests
+        run: dart test --reporter=github
+
+      # ── Version guard ────────────────────────────────────────────────────────
+      # Compare the version declared in pubspec.yaml against the latest version
+      # already published on pub.dev. If they match, this is not a version bump
+      # commit and we skip publishing rather than failing the workflow.
+      - name: Check whether version changed
+        id: version_check
+        run: |
+          PACKAGE_NAME=$(grep '^name:' pubspec.yaml | awk '{print $2}')
+          LOCAL_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+
+          # Fetch the latest published version (returns "0.0.0" if not yet published)
+          PUBLISHED_VERSION=$(
+            curl --silent --fail \
+              "https://pub.dev/api/packages/${PACKAGE_NAME}" \
+            | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('latest', {}).get('version', '0.0.0'))" \
+            2>/dev/null || echo "0.0.0"
+          )
+
+          echo "local=$LOCAL_VERSION"
+          echo "published=$PUBLISHED_VERSION"
+          echo "local_version=$LOCAL_VERSION"   >> "$GITHUB_OUTPUT"
+          echo "published_version=$PUBLISHED_VERSION" >> "$GITHUB_OUTPUT"
+
+          if [ "$LOCAL_VERSION" = "$PUBLISHED_VERSION" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Version $LOCAL_VERSION already published — skipping publish step."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing $PACKAGE_NAME $LOCAL_VERSION (was $PUBLISHED_VERSION)."
+          fi
+
+      # ── Dry-run ──────────────────────────────────────────────────────────────
+      # Validates the package structure (files included, pubspec fields, etc.)
+      # before touching pub.dev. Fails the workflow early if anything is wrong.
+      - name: Dry-run publish
+        if: steps.version_check.outputs.skip == 'false'
+        run: dart pub publish --dry-run
+
+      # ── Publish ──────────────────────────────────────────────────────────────
+      # Uses pub.dev's OIDC automated publishing — no stored credentials needed.
+      # Prerequisites (one-time, done in the Ensend pub.dev dashboard):
+      #   1. Navigate to pub.dev → ensend_sdk → Admin → Automated publishing
+      #   2. Enable GitHub Actions publishing
+      #   3. Set repository to "ensend/ensend-dart" and this workflow file path
+      - name: Publish to pub.dev
+        if: steps.version_check.outputs.skip == 'false'
+        run: dart pub publish --force
