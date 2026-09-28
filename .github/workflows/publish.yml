@@ -96,13 +96,43 @@ jobs:
           echo "new=$NEW"          >> "$GITHUB_OUTPUT"
           echo "Bumped $CURRENT → $NEW (${{ steps.bump.outputs.type }})"
 
+      # ── Update CHANGELOG.md ───────────────────────────────────────────────
+      # Prepends a new version section using the HEAD commit message as the
+      # change description. pub.dev validation requires the current version to
+      # appear in CHANGELOG.md before the package is accepted.
+      - name: Update CHANGELOG.md
+        run: |
+          NEW="${{ steps.version.outputs.new }}"
+          DATE=$(date -u +%Y-%m-%d)
+          MSG="${{ github.event.head_commit.message }}"
+
+          # Strip "[skip ci]" and trailing whitespace from the message
+          CLEAN_MSG=$(echo "$MSG" | sed 's/\[skip ci\]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+          # Build the new entry and prepend it after the first line of CHANGELOG.md
+          ENTRY="## [$NEW] - $DATE\n\n$CLEAN_MSG\n"
+
+          # Insert after the header block (first blank line after the ---  separator)
+          python3 - <<PYEOF
+          import re, pathlib
+
+          path = pathlib.Path('CHANGELOG.md')
+          content = path.read_text()
+
+          # Insert new entry after the first '---' separator line
+          new_entry = f"## [$NEW] - $DATE\n\n$CLEAN_MSG\n\n---\n\n"
+          updated = re.sub(r'(---\n+)', new_entry, content, count=1)
+          path.write_text(updated)
+          print(f"Prepended version $NEW to CHANGELOG.md")
+          PYEOF
+
       # ── Commit and tag ────────────────────────────────────────────────────
       # "[skip ci]" prevents this commit from triggering another workflow run.
       - name: Commit version bump
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pubspec.yaml
+          git add pubspec.yaml CHANGELOG.md
           git commit -m "chore: bump version to ${{ steps.version.outputs.new }} [skip ci]"
           git tag "v${{ steps.version.outputs.new }}"
           git push origin main --follow-tags
