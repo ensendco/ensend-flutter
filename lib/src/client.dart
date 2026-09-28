@@ -168,9 +168,11 @@ class EnsendClient {
     required String publicKey,
     bool ssl = false,
   }) {
-    return ssl
-        ? EnsendSmtpConfig.ssl(publicKey: publicKey, secret: config.secret)
-        : EnsendSmtpConfig(publicKey: publicKey, secret: config.secret);
+    return EnsendSmtpConfig(
+      publicKey: publicKey,
+      secret: config.secret,
+      encryption: ssl ? SmtpEncryption.ssl : SmtpEncryption.starttls,
+    );
   }
 
   /// Releases the underlying HTTP connection pool. Call when the client is no

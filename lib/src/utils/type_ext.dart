@@ -6,7 +6,7 @@ import 'dart:convert';
 /// primitive without risking a [TypeError].
 ///
 /// ```dart
-/// final dynamic raw = someExternalValue;
+/// final Object? raw = someExternalValue;
 /// final id    = raw.asString();
 /// final count = raw.asInt(fallback: -1);
 /// final flag  = raw.asBool();
@@ -15,11 +15,11 @@ extension ObjectCoercionX on Object? {
   /// Coerces to [String].
   ///
   /// Returns `toString()` for non-null values, or [fallback] when `null`.
-  String asString({String fallback = ''}) {
-    final self = this;
-    if (self == null) return fallback;
-    return self is String ? self : self.toString();
-  }
+  String asString({String fallback = ''}) => switch (this) {
+        null => fallback,
+        final String v => v,
+        final Object v => v.toString(),
+      };
 
   /// Coerces to `int`, parsing strings if needed.
   ///
@@ -27,24 +27,22 @@ extension ObjectCoercionX on Object? {
   /// - `double` → truncated via `.toInt()`.
   /// - `String` → parsed via [int.tryParse].
   /// - Any other value returns [fallback].
-  int asInt({int fallback = 0}) {
-    final self = this;
-    if (self == null) return fallback;
-    if (self is int) return self;
-    if (self is double) return self.toInt();
-    if (self is String) return int.tryParse(self) ?? fallback;
-    return fallback;
-  }
+  int asInt({int fallback = 0}) => switch (this) {
+        null => fallback,
+        final int v => v,
+        final double v => v.toInt(),
+        final String v => int.tryParse(v) ?? fallback,
+        _ => fallback,
+      };
 
   /// Coerces to `double`, parsing strings if needed.
-  double asDouble({double fallback = 0.0}) {
-    final self = this;
-    if (self == null) return fallback;
-    if (self is double) return self;
-    if (self is int) return self.toDouble();
-    if (self is String) return double.tryParse(self) ?? fallback;
-    return fallback;
-  }
+  double asDouble({double fallback = 0.0}) => switch (this) {
+        null => fallback,
+        final double v => v,
+        final int v => v.toDouble(),
+        final String v => double.tryParse(v) ?? fallback,
+        _ => fallback,
+      };
 
   /// Coerces to `bool`.
   ///
@@ -52,35 +50,32 @@ extension ObjectCoercionX on Object? {
   /// - `1` / `0` integers and `'true'` / `'false'` strings (case-insensitive)
   ///   are coerced.
   /// - Any other value returns [fallback].
-  bool asBool({bool fallback = false}) {
-    final self = this;
-    if (self == null) return fallback;
-    if (self is bool) return self;
-    if (self is int) return self != 0;
-    if (self is String) {
-      final lower = self.toLowerCase();
-      if (lower == 'true' || lower == '1') return true;
-      if (lower == 'false' || lower == '0') return false;
-    }
-    return fallback;
-  }
+  bool asBool({bool fallback = false}) => switch (this) {
+        null => fallback,
+        final bool v => v,
+        final int v => v != 0,
+        final String v => switch (v.toLowerCase()) {
+            'true' || '1' => true,
+            'false' || '0' => false,
+            _ => fallback,
+          },
+        _ => fallback,
+      };
 
   /// Returns this value as [Map<String, dynamic>], or `null` if it is not a map.
-  Map<String, dynamic>? asJsonMap() {
-    final self = this;
-    if (self is Map<String, dynamic>) return self;
-    if (self is Map<Object?, Object?>) return self.cast<String, dynamic>();
-    return null;
-  }
+  Map<String, dynamic>? asJsonMap() => switch (this) {
+        final Map<String, dynamic> m => m,
+        final Map<Object?, Object?> m => m.cast<String, dynamic>(),
+        _ => null,
+      };
 
   /// Returns this value as `List<T>`, filtering elements that are not [T].
   ///
   /// Returns an empty list if the value is not a [List].
-  List<T> asListOf<T>() {
-    final self = this;
-    if (self is! List) return const [];
-    return self.whereType<T>().toList();
-  }
+  List<T> asListOf<T>() => switch (this) {
+        final List<dynamic> l => l.whereType<T>().toList(),
+        _ => const [],
+      };
 }
 
 /// JSON-parsing helpers on [String].
@@ -95,24 +90,24 @@ extension JsonStringX on String {
   ///
   /// Throws [FormatException] if the string is not valid JSON or the top-level
   /// value is not a JSON object (e.g. a JSON array or primitive).
-  Map<String, dynamic> parseJsonMap() {
-    final result = jsonDecode(this);
-    if (result is Map<String, dynamic>) return result;
-    if (result is Map<Object?, Object?>) return result.cast<String, dynamic>();
-    throw FormatException(
-      'Expected a JSON object, got ${result.runtimeType}',
-    );
-  }
+  Map<String, dynamic> parseJsonMap() => switch (jsonDecode(this)) {
+        final Map<String, dynamic> m => m,
+        final Map<Object?, Object?> m => m.cast<String, dynamic>(),
+        final Object other => throw FormatException(
+            'Expected a JSON object, got ${other.runtimeType}',
+          ),
+        // ignore: dead_code
+        null => throw const FormatException('Expected a JSON object, got null'),
+      };
 
   /// Parses this string as a JSON object, returning `null` on any failure.
   Map<String, dynamic>? tryParseJsonMap() {
     try {
-      final result = jsonDecode(this);
-      if (result is Map<String, dynamic>) return result;
-      if (result is Map<Object?, Object?>) {
-        return result.cast<String, dynamic>();
-      }
-      return null;
+      return switch (jsonDecode(this)) {
+        final Map<String, dynamic> m => m,
+        final Map<Object?, Object?> m => m.cast<String, dynamic>(),
+        _ => null,
+      };
     } catch (_) {
       return null;
     }
@@ -130,6 +125,9 @@ extension JsonStringX on String {
   /// `null` on failure.
   double? toDoubleOrNull() => double.tryParse(this);
 
-  /// Returns `true` if this string is `'true'` (case-insensitive).
-  bool get isTruthy => toLowerCase() == 'true' || this == '1';
+  /// Returns `true` if this string is `'true'` (case-insensitive) or `'1'`.
+  bool get isTruthy => switch (toLowerCase()) {
+        'true' || '1' => true,
+        _ => false,
+      };
 }

@@ -7,6 +7,26 @@ import '../models/send_mail_request.dart';
 import '../utils/json_ext.dart';
 import '../utils/logger.dart';
 
+/// Classifies a JSON response body by its envelope shape.
+enum _Envelope {
+  /// The body contains a top-level `data` key — API success.
+  data,
+
+  /// The body contains a top-level `error` or `message` key — API failure.
+  error,
+
+  /// The body has no recognised envelope — treat as success data with a warning.
+  unknown,
+}
+
+_Envelope _classify(Map<String, dynamic> body) {
+  if (body.containsKey('data')) return _Envelope.data;
+  if (body.containsKey('error') || body.containsKey('message')) {
+    return _Envelope.error;
+  }
+  return _Envelope.unknown;
+}
+
 /// Provides access to the Ensend Send API for transactional email and
 /// broadcast messaging.
 ///
@@ -109,38 +129,35 @@ class SendApi {
     // The API returns HTTP 4xx/5xx bodies as JSON with error details.
     // Both adapters return the parsed body regardless of status code so the
     // response envelope shape is consistent across http and Dio transports.
-    if (body.containsKey('data')) {
-      final nested = body.getMap('data');
-      if (nested == null) {
-        _log.warning(
-          'Response for $path has a "data" key but its value is not a JSON '
-          'object (got ${body['data'].runtimeType}). Treating the whole body '
-          'as success data.',
-        );
-      }
-      return EnsendResponse.success(nested ?? body);
-    }
+    switch (_classify(body)) {
+      case _Envelope.data:
+        final nested = body.getMap('data');
+        if (nested == null) {
+          _log.warning(
+            'Response for $path has a "data" key but its value is not a JSON '
+            'object (got ${body['data'].runtimeType}). Treating the whole body '
+            'as success data.',
+          );
+        }
+        return EnsendResponse.success(nested ?? body);
 
-    if (body.containsKey('error') || body.containsKey('message')) {
-      final rawStatus = body['statusCode'];
-      if (rawStatus != null && rawStatus is! int) {
-        _log.warning(
-          'Response "statusCode" for $path is a ${rawStatus.runtimeType} '
-          '("$rawStatus"), expected int. Coercing.',
-        );
-      }
-      final statusCode = body.getInt('statusCode', fallback: 400);
-      return EnsendResponse.failure(
-        EnsendError.fromJson(body, statusCode),
-      );
-    }
+      case _Envelope.error:
+        final rawStatus = body['statusCode'];
+        if (rawStatus != null && rawStatus is! int) {
+          _log.warning(
+            'Response "statusCode" for $path is a ${rawStatus.runtimeType} '
+            '("$rawStatus"), expected int. Coercing.',
+          );
+        }
+        final statusCode = body.getInt('statusCode', fallback: 400);
+        return EnsendResponse.failure(EnsendError.fromJson(body, statusCode));
 
-    // Body has neither a 'data' nor 'error'/'message' envelope — treat
-    // the whole object as success data and warn so API changes are visible.
-    _log.warning(
-      'Response for $path has no recognised envelope key ("data", "error", or '
-      '"message"). Treating the full body as success data.',
-    );
-    return EnsendResponse.success(body);
+      case _Envelope.unknown:
+        _log.warning(
+          'Response for $path has no recognised envelope key ("data", "error", '
+          'or "message"). Treating the full body as success data.',
+        );
+        return EnsendResponse.success(body);
+    }
   }
 }

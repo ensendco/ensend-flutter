@@ -1,28 +1,63 @@
 import 'package:meta/meta.dart';
 
+/// The TLS mode used when connecting to Ensend's SMTP relay.
+///
+/// ```dart
+/// final smtp = EnsendSmtpConfig(
+///   publicKey: 'pk_...',
+///   secret: 'sk_...',
+///   encryption: SmtpEncryption.ssl,
+/// );
+/// print(smtp.port); // 465
+/// ```
+enum SmtpEncryption {
+  /// STARTTLS upgrade on port **587**. Recommended for most use cases.
+  starttls,
+
+  /// Implicit TLS on port **465**.
+  ssl;
+
+  /// The standard TCP port for this encryption mode.
+  int get port => switch (this) {
+        SmtpEncryption.starttls => 587,
+        SmtpEncryption.ssl => 465,
+      };
+
+  /// Whether the connection uses implicit TLS (`true` for [ssl], `false` for
+  /// [starttls]).
+  bool get useSsl => switch (this) {
+        SmtpEncryption.starttls => false,
+        SmtpEncryption.ssl => true,
+      };
+}
+
 /// SMTP connection settings for sending email through Ensend's SMTP relay.
 ///
 /// Use this when you want to integrate Ensend into an existing SMTP-based
-/// workflow (e.g. with Nodemailer, PHPMailer, or Dart's `mailer` package)
-/// instead of the REST API.
+/// workflow (e.g. with Dart's `mailer` package) instead of the REST API.
 ///
 /// ```dart
+/// // STARTTLS (port 587) — default
 /// final smtp = EnsendSmtpConfig(
 ///   publicKey: 'your_public_key',
 ///   secret: 'your_project_secret',
 /// );
 ///
-/// print(smtp.host);      // smtp.ensend.co
-/// print(smtp.port);      // 587
-/// print(smtp.username);  // your_public_key
-/// print(smtp.password);  // your_project_secret
+/// // Implicit TLS (port 465)
+/// final smtp = EnsendSmtpConfig(
+///   publicKey: 'your_public_key',
+///   secret: 'your_project_secret',
+///   encryption: SmtpEncryption.ssl,
+/// );
+///
+/// print(smtp.host);     // smtp.ensend.co
+/// print(smtp.port);     // 587
+/// print(smtp.username); // your_public_key
+/// print(smtp.password); // your_project_secret
 /// ```
 @immutable
 class EnsendSmtpConfig {
   static const String _host = 'smtp.ensend.co';
-
-  /// The SMTP hostname.
-  String get host => _host;
 
   /// Your project's public key, used as the SMTP username.
   final String publicKey;
@@ -32,13 +67,17 @@ class EnsendSmtpConfig {
   /// Using a sandbox secret sends messages in sandbox mode (free, not delivered).
   final String secret;
 
-  /// The connection port. Defaults to 587 (STARTTLS).
-  /// Use 465 for SSL/TLS.
-  final int port;
+  /// The TLS mode. Defaults to [SmtpEncryption.starttls] (port 587).
+  final SmtpEncryption encryption;
 
-  /// Whether the connection uses implicit TLS (port 465). When false,
-  /// use STARTTLS on port 587.
-  final bool useSsl;
+  /// The SMTP hostname.
+  String get host => _host;
+
+  /// TCP port derived from [encryption].
+  int get port => encryption.port;
+
+  /// Whether the connection uses implicit TLS, derived from [encryption].
+  bool get useSsl => encryption.useSsl;
 
   /// The SMTP username — your project's public key.
   String get username => publicKey;
@@ -49,16 +88,11 @@ class EnsendSmtpConfig {
   const EnsendSmtpConfig({
     required this.publicKey,
     required this.secret,
-    this.port = 587,
-    this.useSsl = false,
+    this.encryption = SmtpEncryption.starttls,
   })  : assert(publicKey != '', 'publicKey must not be empty'),
-        assert(secret != '', 'secret must not be empty'),
-        assert(
-          port == 587 || port == 465,
-          'port must be 587 (STARTTLS) or 465 (SSL)',
-        );
+        assert(secret != '', 'secret must not be empty');
 
-  /// Returns an SSL config on port 465.
+  /// Convenience factory for implicit TLS on port 465.
   factory EnsendSmtpConfig.ssl({
     required String publicKey,
     required String secret,
@@ -66,8 +100,7 @@ class EnsendSmtpConfig {
       EnsendSmtpConfig(
         publicKey: publicKey,
         secret: secret,
-        port: 465,
-        useSsl: true,
+        encryption: SmtpEncryption.ssl,
       );
 
   /// Returns a settings map compatible with common SMTP client libraries.
@@ -83,5 +116,5 @@ class EnsendSmtpConfig {
 
   @override
   String toString() =>
-      'EnsendSmtpConfig(host: $host, port: $port, ssl: $useSsl)';
+      'EnsendSmtpConfig(host: $host, port: $port, encryption: ${encryption.name})';
 }
