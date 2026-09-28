@@ -27,7 +27,7 @@ void main() {
 
   setUp(() {
     mockHttp = MockHttpClient();
-    client = EnsendClient(secret: 'sk_test', httpClient: mockHttp);
+    client = EnsendClient(secret: 'test-secret', httpClient: mockHttp);
   });
 
   tearDown(() => client.close());

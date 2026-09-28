@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 import '../helpers/mock_http_client.dart';
 
-const _config = EnsendConfig(secret: 'sk_test');
+const _config = EnsendConfig(secret: 'test-secret');
 const _body = <String, dynamic>{'subject': 'Hi'};
 
 void main() {
@@ -69,7 +69,7 @@ void main() {
 
       await adapter.post('/send/mail', _body);
 
-      expect(capturedHeaders['Authorization'], 'Bearer sk_test');
+      expect(capturedHeaders['Authorization'], 'Bearer test-secret');
       expect(capturedHeaders['Content-Type'], 'application/json');
     });
 
@@ -111,8 +111,8 @@ void main() {
         ),
       );
 
-      const shortConfig =
-          EnsendConfig(secret: 'sk_test', timeout: Duration(milliseconds: 1));
+      const shortConfig = EnsendConfig(
+          secret: 'test-secret', timeout: Duration(milliseconds: 1));
       final shortAdapter = EnsendHttpClient(shortConfig, httpClient: mockHttp);
       addTearDown(shortAdapter.close);
 
@@ -183,9 +183,9 @@ void main() {
   // ---------------------------------------------------------------------------
   group('EnsendConfig', () {
     test('authHeaders contains correct keys', () {
-      const config = EnsendConfig(secret: 'sk_xyz');
+      const config = EnsendConfig(secret: 'test-secret');
       final h = config.authHeaders;
-      expect(h['Authorization'], 'Bearer sk_xyz');
+      expect(h['Authorization'], 'Bearer test-secret');
       expect(h['Content-Type'], 'application/json');
       expect(h['Accept'], 'application/json');
     });
@@ -196,7 +196,7 @@ void main() {
 
     test('custom baseUrl is respected', () {
       const config =
-          EnsendConfig(secret: 'sk_test', baseUrl: 'http://localhost:9000');
+          EnsendConfig(secret: 'test-secret', baseUrl: 'http://localhost:9000');
       expect(config.baseUrl, 'http://localhost:9000');
     });
 

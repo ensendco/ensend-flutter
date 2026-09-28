@@ -31,7 +31,8 @@ void main() {
   // EnsendSmtpConfig default constructor
   // ---------------------------------------------------------------------------
   group('EnsendSmtpConfig — STARTTLS (default)', () {
-    const smtp = EnsendSmtpConfig(publicKey: 'pk_123', secret: 'sk_abc');
+    const smtp =
+        EnsendSmtpConfig(publicKey: 'test-public-key', secret: 'test-secret');
 
     test('host is smtp.ensend.co', () {
       expect(smtp.host, 'smtp.ensend.co');
@@ -46,11 +47,11 @@ void main() {
     });
 
     test('username equals publicKey', () {
-      expect(smtp.username, 'pk_123');
+      expect(smtp.username, 'test-public-key');
     });
 
     test('password equals secret', () {
-      expect(smtp.password, 'sk_abc');
+      expect(smtp.password, 'test-secret');
     });
 
     test('encryption is starttls', () {
@@ -62,8 +63,8 @@ void main() {
       expect(map['host'], 'smtp.ensend.co');
       expect(map['port'], 587);
       expect(map['secure'], isFalse);
-      expect((map['auth'] as Map<String, dynamic>)['user'], 'pk_123');
-      expect((map['auth'] as Map<String, dynamic>)['pass'], 'sk_abc');
+      expect((map['auth'] as Map<String, dynamic>)['user'], 'test-public-key');
+      expect((map['auth'] as Map<String, dynamic>)['pass'], 'test-secret');
     });
 
     test('toString includes host, port, and encryption name', () {
@@ -77,7 +78,10 @@ void main() {
   // EnsendSmtpConfig.ssl factory
   // ---------------------------------------------------------------------------
   group('EnsendSmtpConfig.ssl factory', () {
-    final smtp = EnsendSmtpConfig.ssl(publicKey: 'pk_123', secret: 'sk_abc');
+    final smtp = EnsendSmtpConfig.ssl(
+      publicKey: 'test-public-key',
+      secret: 'test-secret',
+    );
 
     test('port is 465', () {
       expect(smtp.port, 465);
@@ -101,8 +105,8 @@ void main() {
   // ---------------------------------------------------------------------------
   group('EnsendSmtpConfig — explicit SmtpEncryption.ssl', () {
     const smtp = EnsendSmtpConfig(
-      publicKey: 'pk_xyz',
-      secret: 'sk_xyz',
+      publicKey: 'test-public-key',
+      secret: 'test-secret',
       encryption: SmtpEncryption.ssl,
     );
 
@@ -116,24 +120,24 @@ void main() {
   group('EnsendClient.smtpConfig', () {
     late EnsendClient client;
 
-    setUp(() => client = EnsendClient(secret: 'sk_live'));
+    setUp(() => client = EnsendClient(secret: 'test-secret'));
     tearDown(() => client.close());
 
     test('defaults to STARTTLS (port 587)', () {
-      final smtp = client.smtpConfig(publicKey: 'pk_123');
+      final smtp = client.smtpConfig(publicKey: 'test-public-key');
       expect(smtp.port, 587);
       expect(smtp.useSsl, isFalse);
     });
 
     test('ssl: true gives port 465', () {
-      final smtp = client.smtpConfig(publicKey: 'pk_123', ssl: true);
+      final smtp = client.smtpConfig(publicKey: 'test-public-key', ssl: true);
       expect(smtp.port, 465);
       expect(smtp.useSsl, isTrue);
     });
 
     test('propagates client secret as smtp password', () {
-      final smtp = client.smtpConfig(publicKey: 'pk_123');
-      expect(smtp.password, 'sk_live');
+      final smtp = client.smtpConfig(publicKey: 'test-public-key');
+      expect(smtp.password, 'test-secret');
     });
   });
 }
