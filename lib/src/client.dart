@@ -4,7 +4,7 @@ import 'package:logger/logger.dart';
 
 import 'api/send_api.dart';
 import 'config.dart';
-import 'http/dio_ensend_http_client.dart';
+import 'dio/ensend_dio_client.dart';
 import 'http/ensend_http_adapter.dart';
 import 'http/ensend_http_client.dart';
 import 'smtp/ensend_smtp_config.dart';

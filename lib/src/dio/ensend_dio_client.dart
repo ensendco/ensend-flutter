@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import '../config.dart';
 import '../exceptions.dart';
 import '../utils/logger.dart';
-import 'ensend_http_adapter.dart';
+import '../http/ensend_http_adapter.dart';
 
 /// `package:dio`-backed transport for the Ensend API.
 ///
