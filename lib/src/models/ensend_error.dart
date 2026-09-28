@@ -1,5 +1,7 @@
 import 'package:meta/meta.dart';
 
+import '../utils/json_ext.dart';
+
 /// Represents an error returned by the Ensend API.
 @immutable
 class EnsendError {
@@ -20,8 +22,8 @@ class EnsendError {
 
   factory EnsendError.fromJson(Map<String, dynamic> json, int statusCode) {
     return EnsendError(
-      message: json['message'] as String? ??
-          json['error'] as String? ??
+      message: json.getStringOrNull('message') ??
+          json.getStringOrNull('error') ??
           'Unknown API error',
       statusCode: statusCode,
       details: json,

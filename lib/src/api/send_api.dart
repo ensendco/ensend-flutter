@@ -4,6 +4,8 @@ import '../models/broadcast_mail_request.dart';
 import '../models/ensend_error.dart';
 import '../models/ensend_response.dart';
 import '../models/send_mail_request.dart';
+import '../utils/json_ext.dart';
+import '../utils/logger.dart';
 
 /// Provides access to the Ensend Send API for transactional email and
 /// broadcast messaging.
@@ -11,8 +13,9 @@ import '../models/send_mail_request.dart';
 /// Do not instantiate directly — access it through [EnsendClient.send].
 class SendApi {
   final EnsendHttpAdapter _http;
+  final EnsendLogger _log;
 
-  SendApi(this._http);
+  SendApi(this._http, {EnsendLogger? logger}) : _log = logger ?? EnsendLogger();
 
   /// Sends a transactional email to up to 10 recipients.
   ///
@@ -41,7 +44,10 @@ class SendApi {
   Future<EnsendResponse<Map<String, dynamic>>> sendMail(
     SendMailRequest request,
   ) async {
-    return _execute(() => _http.post('/send/mail', request.toJson()));
+    return _execute(
+      '/send/mail',
+      () => _http.post('/send/mail', request.toJson()),
+    );
   }
 
   /// Initiates a new email broadcast to up to 250 recipients per batch.
@@ -65,6 +71,7 @@ class SendApi {
     BroadcastMailRequest request,
   ) async {
     return _execute(
+      '/send/mail/broadcast',
       () => _http.post('/send/mail/broadcast', request.toJson()),
     );
   }
@@ -88,11 +95,13 @@ class SendApi {
     BroadcastBatchRequest request,
   ) async {
     return _execute(
+      '/send/mail/broadcast',
       () => _http.post('/send/mail/broadcast', request.toJson()),
     );
   }
 
   Future<EnsendResponse<Map<String, dynamic>>> _execute(
+    String path,
     Future<Map<String, dynamic>> Function() call,
   ) async {
     final body = await call();
@@ -101,19 +110,37 @@ class SendApi {
     // Both adapters return the parsed body regardless of status code so the
     // response envelope shape is consistent across http and Dio transports.
     if (body.containsKey('data')) {
-      return EnsendResponse.success(
-        body['data'] as Map<String, dynamic>? ?? body,
-      );
+      final nested = body.getMap('data');
+      if (nested == null) {
+        _log.warning(
+          'Response for $path has a "data" key but its value is not a JSON '
+          'object (got ${body['data'].runtimeType}). Treating the whole body '
+          'as success data.',
+        );
+      }
+      return EnsendResponse.success(nested ?? body);
     }
 
     if (body.containsKey('error') || body.containsKey('message')) {
-      final statusCode = body['statusCode'] as int? ?? 400;
+      final rawStatus = body['statusCode'];
+      if (rawStatus != null && rawStatus is! int) {
+        _log.warning(
+          'Response "statusCode" for $path is a ${rawStatus.runtimeType} '
+          '("$rawStatus"), expected int. Coercing.',
+        );
+      }
+      final statusCode = body.getInt('statusCode', fallback: 400);
       return EnsendResponse.failure(
         EnsendError.fromJson(body, statusCode),
       );
     }
 
-    // Treat the whole body as success data when the API omits an envelope.
+    // Body has neither a 'data' nor 'error'/'message' envelope — treat
+    // the whole object as success data and warn so API changes are visible.
+    _log.warning(
+      'Response for $path has no recognised envelope key ("data", "error", or '
+      '"message"). Treating the full body as success data.',
+    );
     return EnsendResponse.success(body);
   }
 }

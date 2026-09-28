@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import '../exceptions.dart';
 import '../utils/logger.dart';
+import '../utils/type_ext.dart';
 import 'ensend_http_adapter.dart';
 
 /// `package:http`-backed transport for the Ensend API.
@@ -46,17 +46,19 @@ class EnsendHttpClient implements EnsendHttpAdapter {
             body: jsonEncode(body),
           )
           .timeout(config.timeout);
-    } on SocketException catch (e) {
-      final msg = 'Network error: unable to reach ${uri.host}';
-      _log.error(msg, cause: e);
-      throw EnsendNetworkException(msg, cause: e);
     } on TimeoutException {
       final msg =
           'Request to $path timed out after ${config.timeout.inSeconds}s';
       _log.error(msg);
       throw EnsendTimeoutException(msg);
     } on http.ClientException catch (e) {
-      final msg = 'HTTP client error: ${e.message}';
+      final msg = 'Network error: ${e.message}';
+      _log.error(msg, cause: e);
+      throw EnsendNetworkException(msg, cause: e);
+    } on Exception catch (e) {
+      // Catch any platform-specific I/O exception that escaped the http package
+      // wrapper (e.g. SocketException on native in rare edge cases).
+      final msg = 'Network error: $e';
       _log.error(msg, cause: e);
       throw EnsendNetworkException(msg, cause: e);
     }
@@ -68,7 +70,7 @@ class EnsendHttpClient implements EnsendHttpAdapter {
     late Map<String, dynamic> body;
 
     try {
-      body = jsonDecode(response.body) as Map<String, dynamic>;
+      body = response.body.parseJsonMap();
     } catch (e) {
       final msg =
           'Failed to parse API response (status ${response.statusCode})';
