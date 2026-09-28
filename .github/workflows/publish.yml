@@ -1,28 +1,30 @@
 name: Version & Publish
 
 # Triggers on every push to main — which includes merged pull requests.
-# GitHub natively skips any workflow when the commit message contains
-# "[skip ci]", so the version-bump commit this workflow creates won't
-# trigger a second run.
+# GitHub natively skips workflows when the commit message contains "[skip ci]",
+# so the version-bump commit this workflow creates will not trigger a second run.
 on:
   push:
     branches: [main]
 
-# ── Permissions ───────────────────────────────────────────────────────────────
-# contents:write  — push the version-bump commit + tag back to main
-# id-token:write  — exchange for a pub.dev OIDC token (no stored secrets)
+# contents:write — push version-bump commit + tag back to main
+# id-token:write — exchange for a pub.dev OIDC token (no stored secrets needed)
 permissions:
   id-token: write
   contents: write
 
 # ┌─────────────────────────────────────────────────────────────────────────────┐
-# │  Version bump rules (read from merge commit message)                        │
+# │  Version bump rules (read from the merge commit message)                    │
 # │                                                                             │
-# │  "BREAKING CHANGE" anywhere in message → major bump  (1.0.0 → 2.0.0)      │
-# │  message starts with "feat:"           → minor bump  (0.1.0 → 0.2.0)      │
-# │  anything else                         → patch bump  (0.1.0 → 0.1.1)      │
+# │  "BREAKING CHANGE" anywhere → major  (1.2.3 → 2.0.0)                      │
+# │  starts with "feat:"        → minor  (1.2.3 → 1.3.0)                      │
+# │  anything else              → patch  (1.2.3 → 1.2.4)                      │
 # │                                                                             │
-# │  One-time GitHub setup required so the bot can push to protected main:     │
+# │  The bump only happens when the local pubspec.yaml version already exists  │
+# │  on pub.dev (i.e. no manual bump was made on this branch).                 │
+# │  If the local version is already ahead of pub.dev it is published as-is.   │
+# │                                                                             │
+# │  One-time GitHub setup so the bot can push to a protected main branch:     │
 # │    Settings → Branches → main protection rule                              │
 # │    → "Allow specified actors to bypass required pull requests"             │
 # │    → add "github-actions[bot]"                                             │
@@ -36,8 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history lets git push back; GITHUB_TOKEN write access is set
-          # via the permissions block above.
           fetch-depth: 0
 
       - uses: dart-lang/setup-dart@v1
@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: dart pub get
 
-      # ── Quality gates (mirror ci.yml) ─────────────────────────────────────
+      # ── Quality gates ─────────────────────────────────────────────────────
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed .
 
@@ -57,10 +57,44 @@ jobs:
       - name: Run tests
         run: dart test --reporter=github
 
-      # ── Determine version bump type ───────────────────────────────────────
-      # Reads the HEAD commit message (= the merge commit for a squash/merge PR).
+      # ── Decide whether to bump ────────────────────────────────────────────
+      # Compare the local pubspec.yaml version against the latest published
+      # version on pub.dev. If they are the same the local version is already
+      # live and we must bump. If the local version is already ahead (manual
+      # bump committed to this PR) we publish it as-is without bumping again.
+      - name: Check pub.dev version
+        id: pubcheck
+        run: |
+          PACKAGE=$(grep '^name:' pubspec.yaml | awk '{print $2}')
+          LOCAL=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+
+          PUBLISHED=$(
+            curl --silent --fail \
+              "https://pub.dev/api/packages/${PACKAGE}" \
+            | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(d.get('latest', {}).get('version', '0.0.0'))
+          " 2>/dev/null || echo "0.0.0"
+          )
+
+          echo "local=$LOCAL"
+          echo "published=$PUBLISHED"
+          echo "local=$LOCAL"     >> "$GITHUB_OUTPUT"
+          echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
+
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "needs_bump=true"  >> "$GITHUB_OUTPUT"
+            echo "Version $LOCAL is already on pub.dev — will auto-bump."
+          else
+            echo "needs_bump=false" >> "$GITHUB_OUTPUT"
+            echo "Local version $LOCAL is ahead of pub.dev ($PUBLISHED) — publishing as-is."
+          fi
+
+      # ── Determine bump type ───────────────────────────────────────────────
       - name: Determine bump type
         id: bump
+        if: steps.pubcheck.outputs.needs_bump == 'true'
         run: |
           MSG="${{ github.event.head_commit.message }}"
 
@@ -75,11 +109,12 @@ jobs:
           echo "type=$BUMP" >> "$GITHUB_OUTPUT"
           echo "Bump type: $BUMP"
 
-      # ── Bump version in pubspec.yaml ──────────────────────────────────────
+      # ── Bump pubspec.yaml version by exactly one step ─────────────────────
       - name: Bump version
         id: version
+        if: steps.pubcheck.outputs.needs_bump == 'true'
         run: |
-          CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          CURRENT="${{ steps.pubcheck.outputs.local }}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
           case "${{ steps.bump.outputs.type }}" in
@@ -89,62 +124,78 @@ jobs:
           esac
 
           NEW="$MAJOR.$MINOR.$PATCH"
-          # Use a delimiter that won't clash with version strings
           sed -i "s|^version:.*|version: $NEW|" pubspec.yaml
 
-          echo "previous=$CURRENT" >> "$GITHUB_OUTPUT"
-          echo "new=$NEW"          >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
           echo "Bumped $CURRENT → $NEW (${{ steps.bump.outputs.type }})"
 
-      # ── Update CHANGELOG.md ───────────────────────────────────────────────
-      # Prepends a new version section using the HEAD commit message as the
-      # change description. pub.dev validation requires the current version to
-      # appear in CHANGELOG.md before the package is accepted.
-      - name: Update CHANGELOG.md
+      # When no bump was needed the "new" version is whatever is in pubspec.yaml
+      - name: Resolve final version
+        id: final
         run: |
-          NEW="${{ steps.version.outputs.new }}"
-          DATE=$(date -u +%Y-%m-%d)
-          MSG="${{ github.event.head_commit.message }}"
+          if [ "${{ steps.pubcheck.outputs.needs_bump }}" = "true" ]; then
+            echo "version=${{ steps.version.outputs.new }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ steps.pubcheck.outputs.local }}" >> "$GITHUB_OUTPUT"
+          fi
 
-          # Strip "[skip ci]" and trailing whitespace from the message
-          CLEAN_MSG=$(echo "$MSG" | sed 's/\[skip ci\]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      # ── Update CHANGELOG.md ───────────────────────────────────────────────
+      # Pass all dynamic values as environment variables so the Python script
+      # never interpolates user-controlled strings (commit messages can contain
+      # newlines, quotes, and backslashes that would break a heredoc f-string).
+      - name: Update CHANGELOG.md
+        env:
+          NEW_VERSION: ${{ steps.final.outputs.version }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          python3 - <<'PYEOF'
+          import re, pathlib, os
+          from datetime import date
 
-          # Build the new entry and prepend it after the first line of CHANGELOG.md
-          ENTRY="## [$NEW] - $DATE\n\n$CLEAN_MSG\n"
+          new_ver   = os.environ["NEW_VERSION"]
+          commit    = os.environ["COMMIT_MSG"]
+          today     = date.today().isoformat()
 
-          # Insert after the header block (first blank line after the ---  separator)
-          python3 - <<PYEOF
-          import re, pathlib
+          # Strip "[skip ci]" and stray whitespace from the commit message
+          clean = re.sub(r'\[skip ci\]', '', commit, flags=re.IGNORECASE).strip()
 
-          path = pathlib.Path('CHANGELOG.md')
+          path    = pathlib.Path("CHANGELOG.md")
           content = path.read_text()
 
-          # Insert new entry after the first '---' separator line
-          new_entry = f"## [$NEW] - $DATE\n\n$CLEAN_MSG\n\n---\n\n"
-          updated = re.sub(r'(---\n+)', new_entry, content, count=1)
-          path.write_text(updated)
-          print(f"Prepended version $NEW to CHANGELOG.md")
+          # Only prepend if this version isn't already in the file
+          if f"## [{new_ver}]" in content:
+              print(f"Version {new_ver} already in CHANGELOG.md — skipping.")
+          else:
+              entry   = f"## [{new_ver}] - {today}\n\n{clean}\n\n---\n\n"
+              updated = re.sub(r"(---\s*\n)", entry, content, count=1)
+              path.write_text(updated)
+              print(f"Prepended {new_ver} to CHANGELOG.md")
           PYEOF
 
-      # ── Commit and tag ────────────────────────────────────────────────────
-      # "[skip ci]" prevents this commit from triggering another workflow run.
-      - name: Commit version bump
+      # ── Commit, tag, and push ─────────────────────────────────────────────
+      # "[skip ci]" in the commit message tells GitHub Actions (and most CI
+      # providers) to skip all workflow runs triggered by this push, preventing
+      # an infinite loop.
+      - name: Commit and tag
         run: |
+          FINAL="${{ steps.final.outputs.version }}"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pubspec.yaml CHANGELOG.md
-          git commit -m "chore: bump version to ${{ steps.version.outputs.new }} [skip ci]"
-          git tag "v${{ steps.version.outputs.new }}"
+          # --allow-empty guards against the case where nothing changed
+          # (e.g. CHANGELOG entry already existed and version was already ahead)
+          git diff --cached --quiet && echo "Nothing to commit." || \
+            git commit -m "chore: bump version to $FINAL [skip ci]"
+          git tag "v$FINAL" 2>/dev/null || echo "Tag v$FINAL already exists."
           git push origin main --follow-tags
 
       # ── Publish ───────────────────────────────────────────────────────────
-      # Dry-run first to catch packaging errors before touching pub.dev.
       - name: Dry-run publish
         run: dart pub publish --dry-run
 
-      # Requires automated publishing to be enabled on pub.dev:
+      # Requires automated publishing enabled on pub.dev:
       #   pub.dev → ensend_flutter → Admin → Automated publishing
       #   → Enable GitHub Actions → repository: ensend/ensend-dart
-      #   → workflow: .github/workflows/publish.yml
+      #   → workflow file: .github/workflows/publish.yml
       - name: Publish to pub.dev
         run: dart pub publish --force
