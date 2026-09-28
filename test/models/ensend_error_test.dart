@@ -31,7 +31,7 @@ void main() {
     test('stores raw JSON as details', () {
       final json = <String, dynamic>{
         'message': 'Bad request',
-        'statusCode': 400
+        'statusCode': 400,
       };
       final err = EnsendError.fromJson(json, 400);
       expect(err.details, json);
