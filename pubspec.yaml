@@ -4,7 +4,8 @@ description: >-
   messaging platform. Supports transactional email, email broadcasts, and SMTP.
 version: 0.1.1
 homepage: https://docs.ensend.co
-repository: https://github.com/ensend/ensend-dart
+repository: https://github.com/ensendco/ensend-flutter
+issue_tracker: https://github.com/ensendco/ensend-flutter/issues
 
 environment:
   sdk: ^3.0.0
@@ -12,7 +13,10 @@ environment:
 platforms:
   android:
   ios:
+  linux:
+  macos:
   web:
+  windows:
 
 dependencies:
   http: ^1.2.0

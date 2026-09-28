@@ -10,8 +10,19 @@ on:
   push:
     branches: [main]
 
+# ── Secret required ───────────────────────────────────────────────────────────
+# Create a fine-grained PAT (or classic PAT with repo scope) and store it as a
+# repository secret named GH_PAT:
+#   GitHub → Settings → Secrets and variables → Actions → New repository secret
+#     Name:  GH_PAT
+#     Value: <your PAT>
+#
+# Why: GITHUB_TOKEN pushes do NOT trigger other workflow runs (GitHub policy).
+# A PAT push DOES trigger publish.yml via the tag, which is what pub.dev's
+# OIDC auth requires (it only accepts workflows triggered by tag pushes).
+# ─────────────────────────────────────────────────────────────────────────────
 permissions:
-  contents: write # push version-bump commit + tag back to main
+  contents: write
 
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │  Version bump rules (from the merge commit message)                         │
@@ -36,9 +47,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Use the PAT so the tag push later in this job triggers publish.yml.
+      # GITHUB_TOKEN pushes are silently blocked from triggering other workflows.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
 
       - uses: dart-lang/setup-dart@v1
         with:
@@ -167,15 +181,30 @@ jobs:
           PYEOF
 
       # ── Commit, tag, and push ─────────────────────────────────────────────
-      # The tag push is what triggers publish.yml → pub.dev OIDC publish.
+      # The PAT-authenticated push causes GitHub to trigger publish.yml when
+      # the tag is received. A GITHUB_TOKEN push would be silently swallowed.
       - name: Commit and tag
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           FINAL="${{ steps.final.outputs.version }}"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure the remote to use the PAT for authentication
+          git remote set-url origin \
+            "https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git"
+
           git add pubspec.yaml CHANGELOG.md
           git diff --cached --quiet \
             && echo "Nothing to commit." \
             || git commit -m "chore: bump version to $FINAL [skip ci]"
-          git tag "v$FINAL" 2>/dev/null || echo "Tag v$FINAL already exists."
+
+          # Create tag only if it doesn't already exist
+          if git tag "v$FINAL" 2>/dev/null; then
+            echo "Created tag v$FINAL"
+          else
+            echo "Tag v$FINAL already exists — skipping."
+          fi
+
           git push origin main --follow-tags
