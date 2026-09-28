@@ -112,7 +112,9 @@ void main() {
       );
 
       const shortConfig = EnsendConfig(
-          secret: 'test-secret', timeout: Duration(milliseconds: 1));
+        secret: 'test-secret',
+        timeout: Duration(milliseconds: 1),
+      );
       final shortAdapter = EnsendHttpClient(shortConfig, httpClient: mockHttp);
       addTearDown(shortAdapter.close);
 
