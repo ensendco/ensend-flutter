@@ -103,7 +103,8 @@ class SendApi {
     // 'data' is absent.
     if (body.containsKey('data')) {
       return EnsendResponse.success(
-          body['data'] as Map<String, dynamic>? ?? body);
+        body['data'] as Map<String, dynamic>? ?? body,
+      );
     }
 
     if (body.containsKey('error') || body.containsKey('message')) {

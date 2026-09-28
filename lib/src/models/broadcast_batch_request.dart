@@ -42,12 +42,12 @@ class BroadcastBatchRequest {
     }
     if ((recipients == null || recipients!.isEmpty) &&
         (sources == null || sources!.isEmpty)) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'Either recipients or sources must be provided',
       );
     }
     if (recipients != null && recipients!.length > _maxRecipients) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'BroadcastBatchRequest supports at most $_maxRecipients recipients per batch.',
       );
     }

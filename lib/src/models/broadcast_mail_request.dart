@@ -84,17 +84,17 @@ class BroadcastMailRequest {
     }
     if ((recipients == null || recipients!.isEmpty) &&
         (sources == null || sources!.isEmpty)) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'Either recipients or sources must be provided',
       );
     }
     if (recipients != null && recipients!.length > _maxRecipients) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'BroadcastMailRequest supports at most $_maxRecipients recipients per batch.',
       );
     }
     if (message == null && template == null) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'Either message or template must be provided',
       );
     }

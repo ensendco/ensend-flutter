@@ -5,13 +5,15 @@ import 'package:test/test.dart';
 
 import '../helpers/mock_http_client.dart';
 
-final _sender = EmailSender(address: 'hello@acme.com', name: 'Acme');
-final _recipient = EmailRecipient(address: 'user@example.com', name: 'Alice');
+const _sender = EmailSender(address: 'hello@acme.com', name: 'Acme');
+const _recipient = EmailRecipient(address: 'user@example.com', name: 'Alice');
 
 EnsendClient _makeClient(MockHttpClient mock) =>
     EnsendClient(secret: 'test-secret', httpClient: mock);
 
 void main() {
+  setUpAll(registerFallbacks);
+
   late MockHttpClient mockHttp;
   late EnsendClient client;
 
@@ -26,11 +28,13 @@ void main() {
     test('returns success response when API returns data envelope', () async {
       whenPost(
         mockHttp,
-        successResponse({'data': <String, dynamic>{'id': 'msg_123'}}),
+        successResponse({
+          'data': <String, dynamic>{'id': 'msg_123'}
+        }),
       );
 
       final result = await client.send.sendMail(
-        SendMailRequest(
+        const SendMailRequest(
           subject: 'Test',
           sender: _sender,
           recipients: [_recipient],
@@ -49,7 +53,7 @@ void main() {
       );
 
       final result = await client.send.sendMail(
-        SendMailRequest(
+        const SendMailRequest(
           subject: 'Test',
           sender: _sender,
           recipients: [_recipient],
@@ -62,8 +66,9 @@ void main() {
       expect(result.error!.statusCode, 401);
     });
 
-    test('throws EnsendValidationException before hitting network for invalid request', () {
-      final invalidRequest = SendMailRequest(
+    test('throws EnsendValidationException before network for invalid request',
+        () {
+      const invalidRequest = SendMailRequest(
         subject: '',
         sender: _sender,
         recipients: [_recipient],
@@ -83,7 +88,7 @@ void main() {
       );
 
       await client.send.sendMail(
-        SendMailRequest(
+        const SendMailRequest(
           subject: 'Hello World',
           sender: _sender,
           recipients: [_recipient],
@@ -97,7 +102,10 @@ void main() {
       expect(body['message'], '<p>Test</p>');
       expect(body['preheader'], 'A preview');
       expect(body['sender']['address'], 'hello@acme.com');
-      expect((body['recipients'] as List).first['address'], 'user@example.com');
+      expect(
+        (body['recipients'] as List).first['address'],
+        'user@example.com',
+      );
     });
 
     test('throws EnsendNetworkException on SocketException', () async {
@@ -105,7 +113,7 @@ void main() {
 
       expect(
         () => client.send.sendMail(
-          SendMailRequest(
+          const SendMailRequest(
             subject: 'Test',
             sender: _sender,
             recipients: [_recipient],
@@ -121,11 +129,15 @@ void main() {
     test('returns success on valid broadcast', () async {
       whenPost(
         mockHttp,
-        successResponse({'data': <String, dynamic>{'broadcastRef': 'bcast_abc'}}),
+        successResponse(
+          {
+            'data': <String, dynamic>{'broadcastRef': 'bcast_abc'}
+          },
+        ),
       );
 
       final result = await client.send.sendBroadcast(
-        BroadcastMailRequest(
+        const BroadcastMailRequest(
           subject: 'Newsletter',
           sender: _sender,
           recipients: [_recipient],
@@ -140,7 +152,7 @@ void main() {
     test('throws validation error for empty recipients and sources', () {
       expect(
         () => client.send.sendBroadcast(
-          BroadcastMailRequest(
+          const BroadcastMailRequest(
             subject: 'Newsletter',
             sender: _sender,
             message: 'Hello',
@@ -159,7 +171,7 @@ void main() {
       );
 
       await client.send.sendBroadcastBatch(
-        BroadcastBatchRequest(
+        const BroadcastBatchRequest(
           broadcastRef: 'bcast_xyz',
           recipients: [_recipient],
         ),
@@ -167,13 +179,16 @@ void main() {
 
       final body = capturePostBody(mockHttp);
       expect(body['broadcastRef'], 'bcast_xyz');
-      expect((body['recipients'] as List).first['address'], 'user@example.com');
+      expect(
+        (body['recipients'] as List).first['address'],
+        'user@example.com',
+      );
     });
 
     test('throws validation error for empty broadcastRef', () {
       expect(
         () => client.send.sendBroadcastBatch(
-          BroadcastBatchRequest(
+          const BroadcastBatchRequest(
             broadcastRef: '',
             recipients: [_recipient],
           ),
@@ -187,11 +202,13 @@ void main() {
     test('when() calls onSuccess on success', () async {
       whenPost(
         mockHttp,
-        successResponse({'data': <String, dynamic>{'id': '1'}}),
+        successResponse({
+          'data': <String, dynamic>{'id': '1'}
+        }),
       );
 
       final result = await client.send.sendMail(
-        SendMailRequest(
+        const SendMailRequest(
           subject: 'Test',
           sender: _sender,
           recipients: [_recipient],
@@ -213,7 +230,7 @@ void main() {
       );
 
       final result = await client.send.sendMail(
-        SendMailRequest(
+        const SendMailRequest(
           subject: 'Test',
           sender: _sender,
           recipients: [_recipient],

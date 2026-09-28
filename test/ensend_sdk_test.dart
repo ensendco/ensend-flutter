@@ -1,2 +1,3 @@
-// Run all tests with: dart test
-// Individual test files are discovered automatically by the test runner.
+// Run all tests: dart test
+// Tests are discovered automatically from test/**/*_test.dart files.
+void main() {}

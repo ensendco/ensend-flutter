@@ -53,8 +53,10 @@ class EnsendSmtpConfig {
     this.useSsl = false,
   })  : assert(publicKey != '', 'publicKey must not be empty'),
         assert(secret != '', 'secret must not be empty'),
-        assert(port == 587 || port == 465,
-            'port must be 587 (STARTTLS) or 465 (SSL)');
+        assert(
+          port == 587 || port == 465,
+          'port must be 587 (STARTTLS) or 465 (SSL)',
+        );
 
   /// Returns an SSL config on port 465.
   factory EnsendSmtpConfig.ssl({

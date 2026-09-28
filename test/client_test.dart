@@ -60,7 +60,7 @@ void main() {
 
   group('EnsendConfig', () {
     test('authHeaders contains Bearer token and JSON content type', () {
-      final config = EnsendConfig(secret: 'sk_abc');
+      const config = EnsendConfig(secret: 'sk_abc');
       final headers = config.authHeaders;
       expect(headers['Authorization'], 'Bearer sk_abc');
       expect(headers['Content-Type'], 'application/json');

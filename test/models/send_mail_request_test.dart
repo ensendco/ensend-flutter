@@ -1,14 +1,14 @@
 import 'package:ensend_sdk/ensend_sdk.dart';
 import 'package:test/test.dart';
 
-final _sender = EmailSender(address: 'hello@acme.com', name: 'Acme');
-final _recipient = EmailRecipient(address: 'user@example.com', name: 'Alice');
+const _sender = EmailSender(address: 'hello@acme.com', name: 'Acme');
+const _recipient = EmailRecipient(address: 'user@example.com', name: 'Alice');
 
 void main() {
   group('SendMailRequest', () {
     group('validate', () {
       test('throws when subject is empty', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: '',
           sender: _sender,
           recipients: [_recipient],
@@ -18,7 +18,7 @@ void main() {
       });
 
       test('throws when recipients list is empty', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Hi',
           sender: _sender,
           recipients: [],
@@ -41,7 +41,7 @@ void main() {
       });
 
       test('throws when neither message nor template is provided', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Hi',
           sender: _sender,
           recipients: [_recipient],
@@ -50,7 +50,7 @@ void main() {
       });
 
       test('passes with message only', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Hi',
           sender: _sender,
           recipients: [_recipient],
@@ -60,7 +60,7 @@ void main() {
       });
 
       test('passes with template only', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Hi',
           sender: _sender,
           recipients: [_recipient],
@@ -85,7 +85,7 @@ void main() {
 
     group('toJson', () {
       test('serializes required fields correctly', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Welcome!',
           sender: _sender,
           recipients: [_recipient],
@@ -99,7 +99,7 @@ void main() {
       });
 
       test('omits null optional fields', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Hi',
           sender: _sender,
           recipients: [_recipient],
@@ -121,9 +121,12 @@ void main() {
           preheader: 'Check this out',
           replyAddress: 'support@acme.com',
           attachments: [
-            EmailAttachment.fromUrl(name: 'f.pdf', url: 'https://cdn.com/f.pdf'),
+            EmailAttachment.fromUrl(
+              name: 'f.pdf',
+              url: 'https://cdn.com/f.pdf',
+            ),
           ],
-          options: SendMailOptions(acquiringAudience: 'newsletter'),
+          options: const SendMailOptions(acquiringAudience: 'newsletter'),
         );
         final json = req.toJson();
         expect(json['preheader'], 'Check this out');
@@ -133,7 +136,7 @@ void main() {
       });
 
       test('serializes template variables', () {
-        final req = SendMailRequest(
+        const req = SendMailRequest(
           subject: 'Hi',
           sender: _sender,
           recipients: [_recipient],
@@ -149,7 +152,7 @@ void main() {
     });
 
     test('copyWith preserves unchanged fields', () {
-      final req = SendMailRequest(
+      const req = SendMailRequest(
         subject: 'Original',
         sender: _sender,
         recipients: [_recipient],

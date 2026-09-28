@@ -72,16 +72,17 @@ class SendMailRequest {
       throw const EnsendValidationException('subject must not be empty');
     }
     if (recipients.isEmpty) {
-      throw const EnsendValidationException('At least one recipient is required');
+      throw const EnsendValidationException(
+          'At least one recipient is required');
     }
     if (recipients.length > _maxRecipients) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'SendMailRequest supports at most $_maxRecipients recipients. '
         'Use BroadcastMailRequest for larger lists.',
       );
     }
     if (message == null && template == null) {
-      throw EnsendValidationException(
+      throw const EnsendValidationException(
         'Either message or template must be provided',
       );
     }

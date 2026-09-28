@@ -1,14 +1,14 @@
 import 'package:ensend_sdk/ensend_sdk.dart';
 import 'package:test/test.dart';
 
-final _sender = EmailSender(address: 'news@acme.com');
-final _recipient = EmailRecipient(address: 'user@example.com');
+const _sender = EmailSender(address: 'news@acme.com');
+const _recipient = EmailRecipient(address: 'user@example.com');
 
 void main() {
   group('BroadcastMailRequest', () {
     group('validate', () {
       test('throws when neither recipients nor sources are provided', () {
-        final req = BroadcastMailRequest(
+        const req = BroadcastMailRequest(
           subject: 'Newsletter',
           sender: _sender,
           message: 'Hello',
@@ -30,7 +30,7 @@ void main() {
       });
 
       test('throws when neither message nor template is provided', () {
-        final req = BroadcastMailRequest(
+        const req = BroadcastMailRequest(
           subject: 'Newsletter',
           sender: _sender,
           recipients: [_recipient],
@@ -54,7 +54,7 @@ void main() {
 
     group('toJson', () {
       test('serializes with inline recipients', () {
-        final req = BroadcastMailRequest(
+        const req = BroadcastMailRequest(
           subject: 'Newsletter',
           sender: _sender,
           recipients: [_recipient],
@@ -68,7 +68,7 @@ void main() {
       });
 
       test('includes scheduleFor in ISO 8601 UTC format', () {
-        final scheduleTime = DateTime.utc(2025, 12, 25, 10, 0);
+        final scheduleTime = DateTime.utc(2025, 12, 25, 10);
         final req = BroadcastMailRequest(
           subject: 'Holiday',
           sender: _sender,
@@ -86,7 +86,7 @@ void main() {
           sender: _sender,
           sources: [
             BroadcastSource.csv(
-              CsvSourceConfig(
+              const CsvSourceConfig(
                 label: 'promo-list',
                 url: 'https://s3.example.com/list.csv',
                 columnMappings: {'Email': 'address', 'Name': 'firstName'},
@@ -105,7 +105,7 @@ void main() {
 
   group('BroadcastBatchRequest', () {
     test('throws on empty broadcastRef', () {
-      final req = BroadcastBatchRequest(
+      const req = BroadcastBatchRequest(
         broadcastRef: '',
         recipients: [_recipient],
       );
@@ -113,12 +113,12 @@ void main() {
     });
 
     test('throws when no recipients or sources', () {
-      final req = BroadcastBatchRequest(broadcastRef: 'bcast_123');
+      const req = BroadcastBatchRequest(broadcastRef: 'bcast_123');
       expect(req.validate, throwsA(isA<EnsendValidationException>()));
     });
 
     test('toJson serializes correctly', () {
-      final req = BroadcastBatchRequest(
+      const req = BroadcastBatchRequest(
         broadcastRef: 'bcast_abc',
         recipients: [_recipient],
       );

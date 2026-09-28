@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 void main() {
   group('EmailRecipient', () {
     test('toJson includes all non-null fields', () {
-      final recipient = EmailRecipient(
+      const recipient = EmailRecipient(
         address: 'user@example.com',
         name: 'Alice',
         variables: {'plan': 'Pro'},
@@ -17,14 +17,14 @@ void main() {
     });
 
     test('toJson omits optional fields when null', () {
-      final recipient = EmailRecipient(address: 'user@example.com');
+      const recipient = EmailRecipient(address: 'user@example.com');
       final json = recipient.toJson();
       expect(json.containsKey('name'), isFalse);
       expect(json.containsKey('variables'), isFalse);
     });
 
     test('toJson omits variables when empty map', () {
-      final recipient = EmailRecipient(
+      const recipient = EmailRecipient(
         address: 'user@example.com',
         variables: {},
       );
@@ -32,7 +32,7 @@ void main() {
     });
 
     test('copyWith replaces specified fields', () {
-      final original = EmailRecipient(address: 'a@a.com', name: 'A');
+      const original = EmailRecipient(address: 'a@a.com', name: 'A');
       final copy = original.copyWith(name: 'B', variables: {'x': 1});
       expect(copy.address, 'a@a.com');
       expect(copy.name, 'B');
@@ -41,8 +41,8 @@ void main() {
 
     test('equality based on address and name', () {
       expect(
-        EmailRecipient(address: 'a@a.com', name: 'A'),
-        equals(EmailRecipient(address: 'a@a.com', name: 'A')),
+        const EmailRecipient(address: 'a@a.com', name: 'A'),
+        equals(const EmailRecipient(address: 'a@a.com', name: 'A')),
       );
     });
   });
