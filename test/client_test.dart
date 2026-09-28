@@ -1,4 +1,5 @@
 import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:logger/logger.dart';
 import 'package:test/test.dart';
 
 import 'helpers/mock_http_client.dart';
@@ -108,18 +109,25 @@ void main() {
 
   group('EnsendLogger', () {
     test('is no-op when disabled', () {
-      const logger = EnsendLogger();
+      final logger = EnsendLogger();
       expect(logger.enabled, isFalse);
-      // These should not throw
+      // None of these should throw
       logger.request('POST', 'https://api.ensend.co/send/mail', {});
       logger.response(200, {});
       logger.error('test error');
       logger.info('test info');
+      logger.warning('test warning');
     });
 
     test('enabled flag is set correctly', () {
-      const logger = EnsendLogger(enabled: true);
+      final logger = EnsendLogger(enabled: true);
       expect(logger.enabled, isTrue);
+    });
+
+    test('accepts custom Logger instance', () {
+      final customLogger = Logger(printer: SimplePrinter(printTime: true));
+      final ensendLogger = EnsendLogger(logger: customLogger);
+      expect(ensendLogger.enabled, isFalse);
     });
   });
 }

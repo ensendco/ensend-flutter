@@ -1,70 +1,90 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
+
+import 'package:logger/logger.dart';
 
 /// Internal debug logger for the Ensend SDK.
 ///
-/// When [enabled] is true, request/response details are emitted via
-/// [dart:developer]'s `log()`, which surfaces in Flutter DevTools, Dart
-/// Observatory, and IDE debug consoles — the same channel as Flutter's
-/// `debugPrint`. Output is suppressed in Dart release/profile builds
-/// automatically.
+/// Backed by [package:logger](https://pub.dev/packages/logger) which provides
+/// colour-coded, levelled output with pretty-printing. Output respects
+/// [Logger]'s active [LogFilter]:
+///
+/// - The default [DevelopmentFilter] suppresses logs in Dart release/profile
+///   builds automatically — same safety guarantee as Flutter's `kDebugMode`.
+/// - Pass a custom [Logger] (e.g. with [ProductionFilter]) to keep logs in
+///   release builds when debugging production issues.
 ///
 /// Enable at client construction time:
 /// ```dart
 /// EnsendClient(secret: '...', enableLogging: true)
 /// ```
+///
+/// Bring your own [Logger] for custom printers, filters, or outputs:
+/// ```dart
+/// EnsendClient(
+///   secret: '...',
+///   enableLogging: true,
+///   logger: Logger(
+///     printer: SimplePrinter(),
+///     output: FileOutput(file: logFile),
+///   ),
+/// )
+/// ```
 class EnsendLogger {
-  static const String _name = 'EnsendSDK';
+  static const String _tag = 'EnsendSDK';
 
   final bool enabled;
+  final Logger _logger;
 
-  const EnsendLogger({this.enabled = false});
+  EnsendLogger({this.enabled = false, Logger? logger})
+      : _logger = logger ?? _buildDefaultLogger();
 
-  void request(
-    String method,
-    String url,
-    Map<String, dynamic> body,
-  ) {
+  static Logger _buildDefaultLogger() => Logger(
+        printer: PrettyPrinter(
+          methodCount: 0,
+          errorMethodCount: 6,
+          lineLength: 100,
+          dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
+        ),
+      );
+
+  /// Logs an outgoing HTTP request at **debug** level.
+  void request(String method, String url, Map<String, dynamic> body) {
     if (!enabled) return;
-    final sanitized = _sanitize(body);
-    _print('→ $method $url\n${_encode(sanitized)}');
+    _logger.d('[$_tag] → $method $url\n${_encode(_sanitize(body))}');
   }
 
+  /// Logs a received HTTP response at **info** level.
   void response(int statusCode, Map<String, dynamic> body) {
     if (!enabled) return;
-    _print('← $statusCode\n${_encode(body)}');
+    _logger.i('[$_tag] ← $statusCode\n${_encode(body)}');
   }
 
+  /// Logs a network or serialization error at **error** level.
   void error(String message, {Object? cause}) {
     if (!enabled) return;
-    _print(
-      '✗ $message${cause != null ? '\n  cause: $cause' : ''}',
-      level: 1000,
-    );
+    _logger.e('[$_tag] $message', error: cause);
   }
 
+  /// Logs a general informational message at **info** level.
   void info(String message) {
     if (!enabled) return;
-    _print('ℹ $message');
+    _logger.i('[$_tag] $message');
   }
 
-  void _print(String message, {int level = 0}) {
-    // dart:developer log() is the Dart/Flutter equivalent of debugPrint:
-    // - appears in Flutter DevTools "Logging" tab
-    // - no-op in Dart release mode
-    // - throttle-safe (no buffer overflow on rapid calls)
-    dev.log(message, name: _name, level: level);
+  /// Logs a warning (e.g. deprecated usage, fallback taken) at **warning** level.
+  void warning(String message) {
+    if (!enabled) return;
+    _logger.w('[$_tag] $message');
   }
 
-  /// Masks fields that should never appear in logs.
+  /// Masks fields that must not appear in logs (e.g. large base64 blobs).
   Map<String, dynamic> _sanitize(Map<String, dynamic> body) {
     final copy = Map<String, dynamic>.from(body);
-    // Truncate base64 attachment content — can be megabytes
     if (copy['attachments'] is List) {
       copy['attachments'] = (copy['attachments'] as List).map((a) {
         if (a is Map && a.containsKey('content')) {
           return Map<String, dynamic>.from(a as Map<String, dynamic>)
-            ..['content'] = '<base64 truncated>';
+            ..['content'] = '<base64 — truncated>';
         }
         return a;
       }).toList();

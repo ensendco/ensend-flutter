@@ -39,7 +39,8 @@ class EmailAttachment {
   }) {
     if (name.isEmpty) {
       throw const EnsendValidationException(
-          'Attachment name must not be empty');
+        'Attachment name must not be empty',
+      );
     }
     if (url.isEmpty) {
       throw const EnsendValidationException('Attachment url must not be empty');
@@ -54,7 +55,8 @@ class EmailAttachment {
   }) {
     if (name.isEmpty) {
       throw const EnsendValidationException(
-          'Attachment name must not be empty');
+        'Attachment name must not be empty',
+      );
     }
     if (content.isEmpty) {
       throw const EnsendValidationException(

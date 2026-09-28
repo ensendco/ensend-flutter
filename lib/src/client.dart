@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart';
 
 import 'api/send_api.dart';
 import 'config.dart';
@@ -70,14 +71,17 @@ class EnsendClient {
   /// [secret] — your project's live or sandbox secret key (required).
   /// [baseUrl] — override the API base URL; useful in integration tests.
   /// [timeout] — per-request timeout; defaults to 30 seconds.
-  /// [enableLogging] — emit request/response logs to `dart:developer`
-  ///   (Flutter's `debugPrint` channel). Default false.
+  /// [enableLogging] — emit levelled, colour-coded logs via `package:logger`.
+  ///   Default false.
+  /// [logger] — supply a custom [Logger] (e.g. with a [FileOutput] or
+  ///   [ProductionFilter]). When omitted a [PrettyPrinter] instance is used.
   /// [httpClient] — inject a custom [http.Client] for testing or proxying.
   factory EnsendClient({
     required String secret,
     String baseUrl = 'https://api.ensend.co',
     Duration timeout = const Duration(seconds: 30),
     bool enableLogging = false,
+    Logger? logger,
     http.Client? httpClient,
   }) {
     final cfg = EnsendConfig(
@@ -86,7 +90,7 @@ class EnsendClient {
       timeout: timeout,
       enableLogging: enableLogging,
     );
-    final log = EnsendLogger(enabled: enableLogging);
+    final log = EnsendLogger(enabled: enableLogging, logger: logger);
     if (enableLogging) log.info('EnsendClient initialised [http adapter]');
     return EnsendClient._(
       config: cfg,
@@ -99,7 +103,8 @@ class EnsendClient {
   /// [secret] — your project's live or sandbox secret key (required).
   /// [baseUrl] — override the API base URL.
   /// [timeout] — per-request timeout; defaults to 30 seconds.
-  /// [enableLogging] — emit request/response logs to `dart:developer`.
+  /// [enableLogging] — emit levelled, colour-coded logs via `package:logger`.
+  /// [logger] — supply a custom [Logger] for advanced output (file, remote).
   /// [dio] — supply a pre-configured [Dio] instance to add interceptors,
   ///   certificate pinning, or proxy settings. When omitted a default
   ///   instance is created.
@@ -108,6 +113,7 @@ class EnsendClient {
     String baseUrl = 'https://api.ensend.co',
     Duration timeout = const Duration(seconds: 30),
     bool enableLogging = false,
+    Logger? logger,
     Dio? dio,
   }) {
     final cfg = EnsendConfig(
@@ -116,7 +122,7 @@ class EnsendClient {
       timeout: timeout,
       enableLogging: enableLogging,
     );
-    final log = EnsendLogger(enabled: enableLogging);
+    final log = EnsendLogger(enabled: enableLogging, logger: logger);
     if (enableLogging) log.info('EnsendClient initialised [dio adapter]');
     return EnsendClient._(
       config: cfg,
