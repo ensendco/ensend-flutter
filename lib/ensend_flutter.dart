@@ -3,7 +3,7 @@
 /// ## Quick start
 ///
 /// ```dart
-/// import 'package:ensend_sdk/ensend_sdk.dart';
+/// import 'package:ensend_flutter/ensend_flutter.dart';
 ///
 /// // Default (package:http)
 /// final ensend = EnsendClient(secret: 'your_project_secret');
@@ -28,7 +28,7 @@
 ///   onError: (error) => print('Error: ${error.message}'),
 /// );
 /// ```
-library ensend_sdk;
+library ensend_flutter;
 
 export 'src/client.dart';
 export 'src/api/send_api.dart';

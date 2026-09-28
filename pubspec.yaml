@@ -1,4 +1,4 @@
-name: ensend_sdk
+name: ensend_flutter
 description: >-
   The official Dart/Flutter SDK for the Ensend multi-channel notification and
   messaging platform. Supports transactional email, email broadcasts, and SMTP.

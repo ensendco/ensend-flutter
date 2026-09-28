@@ -1,4 +1,4 @@
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:test/test.dart';
 

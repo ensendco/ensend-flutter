@@ -4,7 +4,7 @@
 ///   • unknown envelope → EnsendResponse.success with full body (+ warning)
 library;
 
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:test/test.dart';
 
 import '../helpers/mock_http_client.dart';

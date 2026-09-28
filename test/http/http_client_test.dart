@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';

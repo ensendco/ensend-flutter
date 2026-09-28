@@ -1,4 +1,4 @@
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:test/test.dart';
 
 const _sender = EmailSender(address: 'hello@acme.com', name: 'Acme');

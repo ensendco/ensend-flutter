@@ -73,7 +73,7 @@ jobs:
       # ── Publish ──────────────────────────────────────────────────────────────
       # Uses pub.dev's OIDC automated publishing — no stored credentials needed.
       # Prerequisites (one-time, done in the Ensend pub.dev dashboard):
-      #   1. Navigate to pub.dev → ensend_sdk → Admin → Automated publishing
+      #   1. Navigate to pub.dev → ensend_flutter → Admin → Automated publishing
       #   2. Enable GitHub Actions publishing
       #   3. Set repository to "ensend/ensend-dart" and this workflow file path
       - name: Publish to pub.dev

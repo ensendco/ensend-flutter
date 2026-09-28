@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 

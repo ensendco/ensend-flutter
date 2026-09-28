@@ -1,8 +1,8 @@
-# ensend_sdk
+# ensend_flutter
 
 The official Dart/Flutter SDK for [Ensend](https://docs.ensend.co) — a multi-channel notification and messaging platform. Supports transactional email, email broadcasts, and SMTP relay configuration.
 
-[![pub package](https://img.shields.io/pub/v/ensend_sdk.svg)](https://pub.dev/packages/ensend_sdk)
+[![pub package](https://img.shields.io/pub/v/ensend_flutter.svg)](https://pub.dev/packages/ensend_flutter)
 [![Dart SDK](https://img.shields.io/badge/dart-%3E%3D3.0.0-blue)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -38,7 +38,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ensend_sdk: ^0.1.0
+  ensend_flutter: ^0.1.0
 ```
 
 Then run:
@@ -54,7 +54,7 @@ flutter pub get
 ## Quick start
 
 ```dart
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 
 void main() async {
   final ensend = EnsendClient(secret: 'your_project_secret');
@@ -668,7 +668,7 @@ Use `mocktail` to stub the underlying `http.Client` without touching the network
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:test/test.dart';
 
 class MockHttpClient extends Mock implements http.Client {}
@@ -718,7 +718,7 @@ Mock the transport abstraction directly. This works for both the `package:http` 
 
 ```dart
 import 'package:mocktail/mocktail.dart';
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:test/test.dart';
 
 class MockEnsendHttpAdapter extends Mock implements EnsendHttpAdapter {}
@@ -759,7 +759,7 @@ void main() {
 ```dart
 import 'package:dio/dio.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:ensend_flutter/ensend_flutter.dart';
 import 'package:test/test.dart';
 
 class MockDio extends Mock implements Dio {}
