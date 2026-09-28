@@ -33,4 +33,4 @@ library ensend_sdk;
 export 'src/client.dart';
 export 'src/api/send_api.dart';
 export 'src/http/ensend_http_client.dart';
-export 'src/http/dio_ensend_http_client.dart';
+export 'src/dio/ensend_dio_client.dart';
