@@ -35,6 +35,7 @@ import 'type_ext.dart';
 class EnsendLogger {
   static const String _tag = 'EnsendSDK';
 
+  /// Whether logging is active. When false every log method is a no-op.
   final bool enabled;
   final Logger _logger;
 

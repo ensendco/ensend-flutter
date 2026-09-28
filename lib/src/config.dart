@@ -29,6 +29,7 @@ class EnsendConfig {
     this.enableLogging = false,
   }) : assert(secret != '', 'secret must not be empty');
 
+  /// HTTP headers required by every Ensend API request — Authorization, Content-Type, Accept.
   Map<String, String> get authHeaders => {
         'Authorization': 'Bearer $secret',
         'Content-Type': 'application/json',

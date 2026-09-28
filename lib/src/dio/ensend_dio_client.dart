@@ -21,6 +21,7 @@ import '../http/ensend_http_adapter.dart';
 /// Auth headers, base URL, timeout, and `validateStatus` are injected
 /// per-request via [Options] so a provided [Dio] instance is never mutated.
 class DioEnsendHttpClient implements EnsendHttpAdapter {
+  /// The resolved configuration used for all requests made by this adapter.
   final EnsendConfig config;
   final EnsendLogger _log;
   final Dio _dio;

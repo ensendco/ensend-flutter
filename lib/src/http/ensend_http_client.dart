@@ -17,6 +17,7 @@ import 'ensend_http_adapter.dart';
 ///
 /// For a `package:dio`-backed alternative see [DioEnsendHttpClient].
 class EnsendHttpClient implements EnsendHttpAdapter {
+  /// The resolved configuration used for all requests made by this adapter.
   final EnsendConfig config;
   final EnsendLogger _log;
   final http.Client _client;
