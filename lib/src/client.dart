@@ -26,7 +26,9 @@ export 'models/ensend_response.dart';
 export 'models/send_mail_options.dart';
 export 'models/send_mail_request.dart';
 export 'smtp/ensend_smtp_config.dart';
+export 'utils/json_ext.dart';
 export 'utils/logger.dart';
+export 'utils/type_ext.dart';
 
 /// The main entry point for the Ensend SDK.
 ///
@@ -63,8 +65,9 @@ class EnsendClient {
   EnsendClient._({
     required this.config,
     required EnsendHttpAdapter adapter,
+    EnsendLogger? logger,
   })  : _adapter = adapter,
-        send = SendApi(adapter);
+        send = SendApi(adapter, logger: logger);
 
   /// Creates an [EnsendClient] backed by `package:http`.
   ///
@@ -95,6 +98,7 @@ class EnsendClient {
     return EnsendClient._(
       config: cfg,
       adapter: EnsendHttpClient(cfg, httpClient: httpClient, logger: log),
+      logger: log,
     );
   }
 
@@ -127,6 +131,7 @@ class EnsendClient {
     return EnsendClient._(
       config: cfg,
       adapter: DioEnsendHttpClient(cfg, dio: dio, logger: log),
+      logger: log,
     );
   }
 
@@ -163,9 +168,11 @@ class EnsendClient {
     required String publicKey,
     bool ssl = false,
   }) {
-    return ssl
-        ? EnsendSmtpConfig.ssl(publicKey: publicKey, secret: config.secret)
-        : EnsendSmtpConfig(publicKey: publicKey, secret: config.secret);
+    return EnsendSmtpConfig(
+      publicKey: publicKey,
+      secret: config.secret,
+      encryption: ssl ? SmtpEncryption.ssl : SmtpEncryption.starttls,
+    );
   }
 
   /// Releases the underlying HTTP connection pool. Call when the client is no

@@ -35,7 +35,7 @@ DioException _dioException(
       message: message,
     );
 
-const _config = EnsendConfig(secret: 'sk_test');
+const _config = EnsendConfig(secret: 'test-secret');
 const _body = <String, dynamic>{'subject': 'Hi'};
 
 /// Stubs mockDio.post to return [response].
@@ -216,7 +216,7 @@ void main() {
 
       expect(
         capturedOptions.headers!['Authorization'],
-        'Bearer sk_test',
+        'Bearer test-secret',
       );
       expect(capturedOptions.validateStatus!.call(400), isTrue);
     });
@@ -224,15 +224,15 @@ void main() {
 
   group('EnsendClient.withDio factory', () {
     test('creates client with Dio adapter', () {
-      final client = EnsendClient.withDio(secret: 'sk_test');
-      expect(client.config.secret, 'sk_test');
+      final client = EnsendClient.withDio(secret: 'test-secret');
+      expect(client.config.secret, 'test-secret');
       expect(client.config.baseUrl, 'https://api.ensend.co');
       client.close();
     });
 
     test('accepts enableLogging flag', () {
       final client = EnsendClient.withDio(
-        secret: 'sk_test',
+        secret: 'test-secret',
         enableLogging: true,
       );
       expect(client.config.enableLogging, isTrue);
@@ -241,7 +241,7 @@ void main() {
 
     test('accepts custom baseUrl', () {
       final client = EnsendClient.withDio(
-        secret: 'sk_test',
+        secret: 'test-secret',
         baseUrl: 'http://localhost:8080',
       );
       expect(client.config.baseUrl, 'http://localhost:8080');
@@ -249,7 +249,7 @@ void main() {
     });
 
     test('exposes send API', () {
-      final client = EnsendClient.withDio(secret: 'sk_test');
+      final client = EnsendClient.withDio(secret: 'test-secret');
       expect(client.send, isNotNull);
       client.close();
     });
@@ -264,7 +264,7 @@ void main() {
       when(mock.close).thenReturn(null);
 
       final client = EnsendClient.withAdapter(
-        secret: 'sk_test',
+        secret: 'test-secret',
         adapter: mock,
       );
       expect(client, isNotNull);

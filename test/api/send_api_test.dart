@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:ensend_sdk/ensend_sdk.dart';
 import 'package:test/test.dart';
 
@@ -108,8 +106,8 @@ void main() {
       );
     });
 
-    test('throws EnsendNetworkException on SocketException', () async {
-      whenPostThrows(mockHttp, const SocketException('No network'));
+    test('throws EnsendNetworkException on network failure', () async {
+      whenPostThrows(mockHttp, Exception('No network'));
 
       expect(
         () => client.send.sendMail(

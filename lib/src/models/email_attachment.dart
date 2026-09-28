@@ -4,33 +4,26 @@ import '../exceptions.dart';
 
 /// A file attachment for an outgoing email.
 ///
-/// Provide either a public [url] or a base64-encoded [content] string —
-/// exactly one must be supplied.
+/// Two variants exist — use the named factories to construct them:
+/// - [EmailAttachment.fromUrl] — attach a file via a publicly accessible URL.
+/// - [EmailAttachment.fromContent] — attach a file via base64-encoded content.
 ///
+/// Because [EmailAttachment] is sealed you can exhaustively switch on it:
 /// ```dart
-/// // From a public URL:
-/// EmailAttachment.fromUrl(name: 'report.pdf', url: 'https://cdn.example.com/report.pdf')
-///
-/// // From base64 content:
-/// EmailAttachment.fromContent(name: 'invoice.pdf', content: base64Encoded)
+/// switch (attachment) {
+///   case UrlEmailAttachment(:final url):
+///     print('linked from $url');
+///   case ContentEmailAttachment():
+///     print('inline content, ${attachment.name}');
+/// }
 /// ```
 @immutable
-class EmailAttachment {
+sealed class EmailAttachment {
   /// The filename as it appears to the recipient. Must include the extension,
   /// e.g. `Resume.pdf`.
   final String name;
 
-  /// A publicly accessible URL to the file. Mutually exclusive with [content].
-  final String? url;
-
-  /// Base64-encoded file content. Mutually exclusive with [url].
-  final String? content;
-
-  const EmailAttachment._({
-    required this.name,
-    this.url,
-    this.content,
-  });
+  const EmailAttachment._(this.name);
 
   /// Creates an attachment from a publicly accessible file URL.
   factory EmailAttachment.fromUrl({
@@ -45,7 +38,7 @@ class EmailAttachment {
     if (url.isEmpty) {
       throw const EnsendValidationException('Attachment url must not be empty');
     }
-    return EmailAttachment._(name: name, url: url);
+    return UrlEmailAttachment._(name: name, url: url);
   }
 
   /// Creates an attachment from a base64-encoded string.
@@ -63,26 +56,55 @@ class EmailAttachment {
         'Attachment content must not be empty',
       );
     }
-    return EmailAttachment._(name: name, content: content);
+    return ContentEmailAttachment._(name: name, content: content);
   }
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        if (url != null) 'url': url,
-        if (content != null) 'content': content,
-      };
+  Map<String, dynamic> toJson();
+
+  @override
+  String toString() => 'EmailAttachment(name: $name)';
+}
+
+/// An [EmailAttachment] whose content is fetched from a public URL at send time.
+@immutable
+final class UrlEmailAttachment extends EmailAttachment {
+  /// The publicly accessible URL of the file to attach.
+  final String url;
+
+  const UrlEmailAttachment._({required String name, required this.url})
+      : super._(name);
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name, 'url': url};
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is EmailAttachment &&
+      other is UrlEmailAttachment && name == other.name && url == other.url;
+
+  @override
+  int get hashCode => Object.hash(name, url);
+}
+
+/// An [EmailAttachment] whose content is provided as a base64-encoded string.
+@immutable
+final class ContentEmailAttachment extends EmailAttachment {
+  /// Base64-encoded file content.
+  final String content;
+
+  const ContentEmailAttachment._({required String name, required this.content})
+      : super._(name);
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name, 'content': content};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ContentEmailAttachment &&
           name == other.name &&
-          url == other.url &&
           content == other.content;
 
   @override
-  int get hashCode => Object.hash(name, url, content);
-
-  @override
-  String toString() => 'EmailAttachment(name: $name)';
+  int get hashCode => Object.hash(name, content);
 }

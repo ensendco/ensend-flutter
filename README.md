@@ -25,6 +25,10 @@ The official Dart/Flutter SDK for [Ensend](https://docs.ensend.co) — a multi-c
 | Pluggable `EnsendHttpAdapter` for custom transports | ✅ |
 | Levelled, colour-coded logging via `package:logger` | ✅ |
 | Mockable adapters for unit testing | ✅ |
+| Sealed `EmailAttachment` (exhaustive switch support) | ✅ |
+| `SmtpEncryption` enum (port + TLS mode in one place) | ✅ |
+| `JsonMapX` / `ObjectCoercionX` parser extensions | ✅ |
+| Sealed `EnsendException` (exhaustive switch support) | ✅ |
 
 ---
 
@@ -377,18 +381,33 @@ Per-recipient `variables` override global template `variables` for that recipien
 
 ### File attachments
 
+`EmailAttachment` is a **sealed class** with two concrete variants. Construct via the named factories:
+
 ```dart
-// Attach from a public URL
+// Attach from a public URL → UrlEmailAttachment
 EmailAttachment.fromUrl(
   name: 'invoice.pdf',
   url: 'https://cdn.acme.com/invoices/inv-1042.pdf',
 )
 
-// Attach from base64-encoded content
+// Attach from base64-encoded content → ContentEmailAttachment
 EmailAttachment.fromContent(
   name: 'receipt.pdf',
   content: base64Encode(pdfBytes),
 )
+```
+
+Because the type is sealed you can exhaustively switch on it:
+
+```dart
+for (final att in request.attachments ?? <EmailAttachment>[]) {
+  switch (att) {
+    case UrlEmailAttachment(:final url):
+      print('Linked: $url');
+    case ContentEmailAttachment(:final content):
+      print('Inline: ${content.length} bytes (base64)');
+  }
+}
 ```
 
 ---
@@ -400,8 +419,11 @@ Every API call returns `EnsendResponse<Map<String, dynamic>>`. Use `.when()` for
 ```dart
 result.when(
   onSuccess: (data) {
-    // data is Map<String, dynamic> with the API response
-    final id = data['id'] as String?;
+    // Use the built-in JsonMapX extension for safe, coercion-free access
+    final id    = data.getString('id');
+    final count = data.getInt('count', fallback: 0);
+    final ok    = data.getBool('acknowledged');
+    final meta  = data.getMap('metadata'); // Map<String, dynamic>?
   },
   onError: (error) {
     print('Status ${error.statusCode}: ${error.message}');
@@ -427,16 +449,23 @@ Network and serialization errors throw instead of returning an `EnsendResponse`:
 | `EnsendTimeoutException` | Request exceeded `EnsendConfig.timeout` |
 | `EnsendSerializationException` | Response body could not be parsed as JSON |
 
+Because `EnsendException` is a **sealed class**, you can exhaustively switch on its subtypes:
+
 ```dart
 try {
   final result = await ensend.send.sendMail(request);
   // handle result.data / result.error
-} on EnsendValidationException catch (e) {
-  print('Fix your request: ${e.message}');
-} on EnsendNetworkException catch (e) {
-  print('Network error: ${e.message}');
-} on EnsendTimeoutException catch (e) {
-  print('Timed out: ${e.message}');
+} on EnsendException catch (e) {
+  switch (e) {
+    case EnsendValidationException():
+      print('Fix your request: ${e.message}');
+    case EnsendNetworkException(:final cause):
+      print('Network error: ${e.message} (caused by: $cause)');
+    case EnsendTimeoutException():
+      print('Timed out: ${e.message}');
+    case EnsendSerializationException():
+      print('Bad response body: ${e.message}');
+  }
 }
 ```
 
@@ -446,17 +475,117 @@ try {
 
 Use Ensend's SMTP server with any SMTP-compatible library.
 
+#### Via `EnsendClient` (recommended)
+
 ```dart
-final smtp = ensend.smtpConfig(
-  publicKey: 'your_public_key',
-  ssl: false, // false = STARTTLS on port 587; true = SSL on port 465
+// STARTTLS port 587 (default)
+final smtp = ensend.smtpConfig(publicKey: 'your_public_key');
+
+// Implicit TLS port 465
+final smtp = ensend.smtpConfig(publicKey: 'your_public_key', ssl: true);
+
+print(smtp.host);       // smtp.ensend.co
+print(smtp.port);       // 587
+print(smtp.username);   // your_public_key
+print(smtp.password);   // your_project_secret (from EnsendClient)
+print(smtp.toMap());    // {"host": ..., "port": ..., "auth": {...}}
+```
+
+#### Via `SmtpEncryption` enum directly
+
+`SmtpEncryption` carries the port and TLS flag, eliminating the coupled `port + useSsl` pair:
+
+```dart
+// Construct directly using the enum
+final smtp = EnsendSmtpConfig(
+  publicKey: 'pk_...',
+  secret: 'sk_...',
+  encryption: SmtpEncryption.ssl,     // port 465, useSsl = true
+  // or SmtpEncryption.starttls       // port 587, useSsl = false (default)
 );
 
-print(smtp.host);      // smtp.ensend.co
-print(smtp.port);      // 587
-print(smtp.username);  // your_public_key
-print(smtp.password);  // your_project_secret (from EnsendClient)
-print(smtp.toMap());   // {"host": ..., "port": ..., "auth": {...}}
+print(smtp.encryption);       // SmtpEncryption.ssl
+print(smtp.port);             // derived from enum → 465
+print(smtp.useSsl);           // derived from enum → true
+
+// Switch exhaustively on the encryption mode if needed
+switch (smtp.encryption) {
+  case SmtpEncryption.starttls:
+    print('Connect then upgrade via STARTTLS');
+  case SmtpEncryption.ssl:
+    print('Connect directly over TLS');
+}
+```
+
+---
+
+## Parser extensions
+
+The SDK exports two extension groups you can use anywhere you work with JSON data — including the `data` map returned inside `EnsendResponse`.
+
+### `JsonMapX` on `Map<String, dynamic>`
+
+Safe, coercing key access that never throws on unexpected types:
+
+```dart
+result.when(
+  onSuccess: (data) {
+    // Strings
+    final id   = data.getString('id');            // '' if missing
+    final name = data.getStringOrNull('name');    // null if missing
+
+    // Numbers (coerces int ↔ double ↔ String automatically)
+    final count  = data.getInt('count', fallback: 0);
+    final price  = data.getDouble('price', fallback: 0.0);
+
+    // Booleans (coerces 1/0 and "true"/"false" strings)
+    final active = data.getBool('active');
+
+    // Nested objects and lists
+    final meta  = data.getMap('metadata');        // Map<String, dynamic>?
+    final tags  = data.getList<String>('tags');   // List<String>
+    final items = data.getMapList('items');       // List<Map<String, dynamic>>
+
+    // Presence check
+    if (data.hasValue('broadcastRef')) { ... }
+  },
+  onError: (e) => print(e.message),
+);
+```
+
+### `ObjectCoercionX` on `Object?`
+
+Type-safe coercion for values typed as `dynamic` or `Object?`:
+
+```dart
+final Object? raw = someExternalValue;
+
+final s = raw.asString();          // '' if null
+final n = raw.asInt(fallback: -1);
+final d = raw.asDouble();
+final b = raw.asBool();
+final m = raw.asJsonMap();         // Map<String, dynamic>? or null
+final l = raw.asListOf<String>();  // filters non-String elements
+```
+
+### `JsonStringX` on `String`
+
+Parse raw JSON strings from HTTP response bodies:
+
+```dart
+// Throws FormatException on bad JSON or non-object top-level
+final map  = responseBody.parseJsonMap();
+
+// Returns null instead of throwing
+final safe = responseBody.tryParseJsonMap();
+
+// Number helpers
+final n = '42'.toIntOrNull();       // int?
+final f = '3.14'.toDoubleOrNull();  // double?
+final i = 'abc'.toIntOr(0);        // 0 — fallback
+
+// Boolean helper
+final ok = 'true'.isTruthy;        // true
 ```
 
 ---

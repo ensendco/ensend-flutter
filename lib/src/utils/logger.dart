@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:logger/logger.dart';
 
+import 'json_ext.dart';
+import 'type_ext.dart';
+
 /// Internal debug logger for the Ensend SDK.
 ///
 /// Backed by [package:logger](https://pub.dev/packages/logger) which provides
@@ -80,11 +83,12 @@ class EnsendLogger {
   /// Masks fields that must not appear in logs (e.g. large base64 blobs).
   Map<String, dynamic> _sanitize(Map<String, dynamic> body) {
     final copy = Map<String, dynamic>.from(body);
-    if (copy['attachments'] is List) {
-      copy['attachments'] = (copy['attachments'] as List).map((a) {
-        if (a is Map && a.containsKey('content')) {
-          return Map<String, dynamic>.from(a as Map<String, dynamic>)
-            ..['content'] = '<base64 — truncated>';
+    final attachments = copy.getList<Object>('attachments');
+    if (attachments.isNotEmpty) {
+      copy['attachments'] = attachments.map((a) {
+        final map = a.asJsonMap();
+        if (map != null && map.containsKey('content')) {
+          return {...map, 'content': '<base64 — truncated>'};
         }
         return a;
       }).toList();
