@@ -5,7 +5,14 @@
 /// ```dart
 /// import 'package:ensend_sdk/ensend_sdk.dart';
 ///
+/// // Default (package:http)
 /// final ensend = EnsendClient(secret: 'your_project_secret');
+///
+/// // With Dio
+/// final ensend = EnsendClient.withDio(secret: 'your_project_secret');
+///
+/// // With debug logging
+/// final ensend = EnsendClient(secret: 'sk_...', enableLogging: true);
 ///
 /// final result = await ensend.send.sendMail(
 ///   SendMailRequest(
@@ -25,3 +32,4 @@ library ensend_sdk;
 
 export 'src/client.dart';
 export 'src/api/send_api.dart';
+export 'src/http/dio_ensend_http_client.dart';

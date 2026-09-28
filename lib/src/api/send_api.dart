@@ -1,4 +1,4 @@
-import '../http/ensend_http_client.dart';
+import '../http/ensend_http_adapter.dart';
 import '../models/broadcast_batch_request.dart';
 import '../models/broadcast_mail_request.dart';
 import '../models/ensend_error.dart';
@@ -10,7 +10,7 @@ import '../models/send_mail_request.dart';
 ///
 /// Do not instantiate directly — access it through [EnsendClient.send].
 class SendApi {
-  final EnsendHttpClient _http;
+  final EnsendHttpAdapter _http;
 
   SendApi(this._http);
 
@@ -98,9 +98,8 @@ class SendApi {
     final body = await call();
 
     // The API returns HTTP 4xx/5xx bodies as JSON with error details.
-    // The HTTP layer always returns the parsed body regardless of status code;
-    // we detect errors by the presence of an 'error' or 'message' key when
-    // 'data' is absent.
+    // Both adapters return the parsed body regardless of status code so the
+    // response envelope shape is consistent across http and Dio transports.
     if (body.containsKey('data')) {
       return EnsendResponse.success(
         body['data'] as Map<String, dynamic>? ?? body,

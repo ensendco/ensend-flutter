@@ -73,7 +73,8 @@ class SendMailRequest {
     }
     if (recipients.isEmpty) {
       throw const EnsendValidationException(
-          'At least one recipient is required');
+        'At least one recipient is required',
+      );
     }
     if (recipients.length > _maxRecipients) {
       throw const EnsendValidationException(

@@ -6,23 +6,35 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import '../exceptions.dart';
+import '../utils/logger.dart';
+import 'ensend_http_adapter.dart';
 
-/// Low-level HTTP wrapper used by all API classes.
+/// `package:http`-backed transport for the Ensend API.
 ///
-/// Inject a custom [http.Client] in tests to intercept requests without
-/// hitting the network.
-class EnsendHttpClient {
+/// This is the default adapter used when you construct [EnsendClient] without
+/// specifying an HTTP library. Pass a custom [http.Client] to intercept
+/// requests in tests.
+///
+/// For a `package:dio`-backed alternative see [DioEnsendHttpClient].
+class EnsendHttpClient implements EnsendHttpAdapter {
   final EnsendConfig config;
+  final EnsendLogger _log;
   final http.Client _client;
 
-  EnsendHttpClient(this.config, {http.Client? httpClient})
-      : _client = httpClient ?? http.Client();
+  EnsendHttpClient(
+    this.config, {
+    http.Client? httpClient,
+    EnsendLogger? logger,
+  })  : _client = httpClient ?? http.Client(),
+        _log = logger ?? EnsendLogger(enabled: config.enableLogging);
 
+  @override
   Future<Map<String, dynamic>> post(
     String path,
     Map<String, dynamic> body,
   ) async {
     final uri = Uri.parse('${config.baseUrl}$path');
+    _log.request('POST', uri.toString(), body);
 
     late http.Response response;
 
@@ -35,16 +47,18 @@ class EnsendHttpClient {
           )
           .timeout(config.timeout);
     } on SocketException catch (e) {
-      throw EnsendNetworkException(
-        'Network error: unable to reach ${uri.host}',
-        cause: e,
-      );
+      final msg = 'Network error: unable to reach ${uri.host}';
+      _log.error(msg, cause: e);
+      throw EnsendNetworkException(msg, cause: e);
     } on TimeoutException {
-      throw EnsendTimeoutException(
-        'Request to $path timed out after ${config.timeout.inSeconds}s',
-      );
+      final msg =
+          'Request to $path timed out after ${config.timeout.inSeconds}s';
+      _log.error(msg);
+      throw EnsendTimeoutException(msg);
     } on http.ClientException catch (e) {
-      throw EnsendNetworkException('HTTP client error: ${e.message}', cause: e);
+      final msg = 'HTTP client error: ${e.message}';
+      _log.error(msg, cause: e);
+      throw EnsendNetworkException(msg, cause: e);
     }
 
     return _parseResponse(response);
@@ -56,14 +70,16 @@ class EnsendHttpClient {
     try {
       body = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {
-      throw EnsendSerializationException(
-        'Failed to parse API response (status ${response.statusCode})',
-        cause: e,
-      );
+      final msg =
+          'Failed to parse API response (status ${response.statusCode})';
+      _log.error(msg, cause: e);
+      throw EnsendSerializationException(msg, cause: e);
     }
 
+    _log.response(response.statusCode, body);
     return body;
   }
 
+  @override
   void close() => _client.close();
 }

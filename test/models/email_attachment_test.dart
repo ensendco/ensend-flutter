@@ -19,7 +19,9 @@ void main() {
       test('throws on empty name', () {
         expect(
           () => EmailAttachment.fromUrl(
-              name: '', url: 'https://example.com/f.pdf'),
+            name: '',
+            url: 'https://example.com/f.pdf',
+          ),
           throwsA(isA<EnsendValidationException>()),
         );
       });

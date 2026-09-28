@@ -29,7 +29,7 @@ void main() {
       whenPost(
         mockHttp,
         successResponse({
-          'data': <String, dynamic>{'id': 'msg_123'}
+          'data': <String, dynamic>{'id': 'msg_123'},
         }),
       );
 
@@ -131,7 +131,7 @@ void main() {
         mockHttp,
         successResponse(
           {
-            'data': <String, dynamic>{'broadcastRef': 'bcast_abc'}
+            'data': <String, dynamic>{'broadcastRef': 'bcast_abc'},
           },
         ),
       );
@@ -203,7 +203,7 @@ void main() {
       whenPost(
         mockHttp,
         successResponse({
-          'data': <String, dynamic>{'id': '1'}
+          'data': <String, dynamic>{'id': '1'},
         }),
       );
 
