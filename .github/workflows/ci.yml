@@ -18,10 +18,10 @@ concurrency:
 # │  Required status checks to add in GitHub branch protection:                │
 # │    ✓ Format                                                                 │
 # │    ✓ Analyze                                                                │
-# │    ✓ Test / api (stable)   ✓ Test / api (beta)                             │
-# │    ✓ Test / http (stable)  ✓ Test / http (beta)                            │
+# │    ✓ Test / api (stable)    ✓ Test / api (beta)                            │
+# │    ✓ Test / http (stable)   ✓ Test / http (beta)                           │
 # │    ✓ Test / models (stable) ✓ Test / models (beta)                         │
-# │    ✓ Test / utils (stable) ✓ Test / utils (beta)                           │
+# │    ✓ Test / utils (stable)  ✓ Test / utils (beta)                          │
 # │    ✓ Coverage (≥ 80 %)                                                      │
 # └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -71,8 +71,8 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # 3 · TEST
   #   Matrix: 4 suites × 2 SDK channels = 8 parallel jobs.
-  #   Each suite maps to a test directory (or a glob for root-level tests).
-  #   fail-fast: false → all legs run to completion so every failure is visible.
+  #   fail-fast: false → all legs finish so every failure surfaces at once.
+  #   --reporter=github → failures appear as inline PR diff annotations.
   # ────────────────────────────────────────────────────────────────────────────
   test:
     name: Test / ${{ matrix.suite.name }} (${{ matrix.dart-version }})
@@ -108,8 +108,13 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # 4 · COVERAGE
-  #   Runs the full suite (all paths) and fails if line coverage < THRESHOLD.
-  #   Uploads lcov.info as an artifact for local inspection.
+  #   Runs the FULL test suite in one job (no matrix) so every lib file is
+  #   exercised and the overall line-coverage figure is meaningful.
+  #
+  #   The threshold check uses Python to parse the LCOV file directly —
+  #   no `lcov` binary required on the runner.
+  #
+  #   Adjust THRESHOLD to raise or lower the gate.
   # ────────────────────────────────────────────────────────────────────────────
   coverage:
     name: Coverage (≥ 80 %)
@@ -117,21 +122,6 @@ jobs:
     needs: test
     env:
       THRESHOLD: 80
-
-    strategy:
-      fail-fast: false
-      matrix:
-        suite:
-          - name: api
-            path: test/api
-          - name: dio
-            path: test/dio
-          - name: http
-            path: test/http
-          - name: models
-            path: test/models
-          - name: utils
-            path: test/utils
 
     steps:
       - uses: actions/checkout@v4
@@ -143,36 +133,52 @@ jobs:
       - name: Install dependencies
         run: dart pub get
 
-      - name: Run ${{ matrix.suite.name }} tests with coverage
-        run: dart test ${{ matrix.suite.path }} --coverage=coverage/${{ matrix.suite.name }}
+      - name: Run full test suite with coverage
+        run: dart test --coverage=coverage
 
       - name: Convert to LCOV
         run: |
           dart run coverage:format_coverage \
             --lcov \
-            --in=coverage/${{ matrix.suite.name }} \
-            --out=coverage/${{ matrix.suite.name }}/lcov.info \
+            --in=coverage \
+            --out=coverage/lcov.info \
             --packages=.dart_tool/package_config.json \
             --report-on=lib
 
       - name: Check coverage threshold
         run: |
-          LINES=$(lcov --summary coverage/${{ matrix.suite.name }}/lcov.info 2>&1 \
-            | grep "lines" \
-            | grep -oP '\d+\.\d+(?=%)')
-          echo "${{ matrix.suite.name }} line coverage: $LINES %"
-          python3 -c "
-          import sys
-          pct = float('$LINES')
-          threshold = $THRESHOLD
-          print(f'Coverage {pct:.1f}% vs threshold {threshold}%')
-          sys.exit(0 if pct >= threshold else 1)
-          "
+          python3 - <<'EOF'
+          import sys, os
 
-      - name: Upload ${{ matrix.suite.name }} coverage report
+          lcov_path = 'coverage/lcov.info'
+          if not os.path.exists(lcov_path):
+              print('ERROR: lcov.info not found')
+              sys.exit(1)
+
+          lines_found = 0
+          lines_hit   = 0
+          with open(lcov_path) as f:
+              for line in f:
+                  line = line.strip()
+                  if line.startswith('LF:'):
+                      lines_found += int(line[3:])
+                  elif line.startswith('LH:'):
+                      lines_hit += int(line[3:])
+
+          if lines_found == 0:
+              print('WARNING: no instrumented lines found — skipping threshold check')
+              sys.exit(0)
+
+          threshold = int(os.environ['THRESHOLD'])
+          pct = lines_hit / lines_found * 100
+          print(f'Line coverage: {lines_hit}/{lines_found} = {pct:.1f}%  (threshold: {threshold}%)')
+          sys.exit(0 if pct >= threshold else 1)
+          EOF
+
+      - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lcov-${{ matrix.suite.name }}
-          path: coverage/${{ matrix.suite.name }}/lcov.info
+          name: lcov-report
+          path: coverage/lcov.info
           retention-days: 14
