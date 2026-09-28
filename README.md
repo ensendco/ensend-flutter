@@ -20,7 +20,11 @@ The official Dart/Flutter SDK for [Ensend](https://docs.ensend.co) — a multi-c
 | CSV and audience-group broadcast sources | ✅ |
 | SMTP relay configuration helper | ✅ |
 | Typed response model with `.when()` pattern | ✅ |
-| Mockable HTTP client for unit testing | ✅ |
+| `package:http` transport (default) | ✅ |
+| `package:dio` transport with interceptor support | ✅ |
+| Pluggable `EnsendHttpAdapter` for custom transports | ✅ |
+| Levelled, colour-coded logging via `package:logger` | ✅ |
+| Mockable adapters for unit testing | ✅ |
 
 ---
 
@@ -95,26 +99,121 @@ final ensend = EnsendClient(secret: 'sk_sandbox_...');
 
 ---
 
+## Choosing an HTTP transport
+
+The SDK ships two fully-tested HTTP adapters. Both implement the same `EnsendHttpAdapter` interface, so you can swap them without changing any application code.
+
+### Default: `package:http`
+
+The out-of-the-box choice. No extra setup needed:
+
+```dart
+final ensend = EnsendClient(secret: 'sk_...');
+```
+
+### Dio: `package:dio`
+
+Use `EnsendClient.withDio` for richer middleware support — retry policies, certificate pinning, response caching, or observability interceptors:
+
+```dart
+// Minimal — creates a clean Dio instance internally
+final ensend = EnsendClient.withDio(secret: 'sk_...');
+
+// Advanced — bring your own Dio with interceptors pre-attached
+import 'package:dio/dio.dart';
+
+final dio = Dio()
+  ..interceptors.add(LogInterceptor(responseBody: true))
+  ..interceptors.add(RetryInterceptor(dio: dio, retries: 3));
+
+final ensend = EnsendClient.withDio(secret: 'sk_...', dio: dio);
+```
+
+The SDK **never mutates** your Dio instance's base options. Authentication headers and timeouts are injected per-request via `Options`, so your existing interceptor chain is untouched.
+
+### Custom transport: `EnsendClient.withAdapter`
+
+Implement `EnsendHttpAdapter` to plug in any HTTP backend — useful for advanced proxy setups, integration tests against a fake server, or non-standard environments:
+
+```dart
+class MyCustomAdapter implements EnsendHttpAdapter {
+  @override
+  Future<Map<String, dynamic>> post(
+      String path, Map<String, dynamic> body) async {
+    // your transport logic
+  }
+
+  @override
+  void close() { /* clean up */ }
+}
+
+final ensend = EnsendClient.withAdapter(
+  secret: 'sk_...',
+  adapter: MyCustomAdapter(),
+);
+```
+
+---
+
 ## API Reference
 
-### `EnsendClient`
+### `EnsendClient` factory constructors
 
-The main entry point. Create once at startup and reuse throughout your app.
+#### `EnsendClient({...})` — `package:http` backend
 
 ```dart
 final ensend = EnsendClient(
-  secret: 'your_project_secret',
-  baseUrl: 'https://api.ensend.co', // default
-  timeout: Duration(seconds: 30),   // default
+  secret: 'your_project_secret',      // required
+  baseUrl: 'https://api.ensend.co',   // default
+  timeout: Duration(seconds: 30),     // default
+  enableLogging: false,               // default — see Logging section
+  logger: null,                       // inject a custom Logger instance
+  httpClient: null,                   // inject an http.Client for testing
 );
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `secret` | `String` | **Required.** Your live or sandbox project secret. |
-| `baseUrl` | `String` | API base URL. Override in tests. |
+| `secret` | `String` | **Required.** Live or sandbox project secret. |
+| `baseUrl` | `String` | API base URL. Override to point at a local stub server in tests. |
 | `timeout` | `Duration` | Per-request timeout (default 30 s). |
-| `httpClient` | `http.Client?` | Inject a custom client for testing/proxying. |
+| `enableLogging` | `bool` | Enable debug output via `package:logger` (default `false`). |
+| `logger` | `Logger?` | Custom `Logger` from `package:logger`. Uses `PrettyPrinter` when omitted. |
+| `httpClient` | `http.Client?` | Inject a custom client for testing or proxying. |
+
+#### `EnsendClient.withDio({...})` — `package:dio` backend
+
+```dart
+final ensend = EnsendClient.withDio(
+  secret: 'your_project_secret',
+  baseUrl: 'https://api.ensend.co',
+  timeout: Duration(seconds: 30),
+  enableLogging: false,
+  logger: null,   // inject a custom Logger instance
+  dio: null,      // inject a pre-configured Dio instance
+);
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `secret` | `String` | **Required.** Live or sandbox project secret. |
+| `baseUrl` | `String` | API base URL. |
+| `timeout` | `Duration` | Per-request timeout (default 30 s). |
+| `enableLogging` | `bool` | Enable debug output via `package:logger` (default `false`). |
+| `logger` | `Logger?` | Custom `Logger` from `package:logger`. |
+| `dio` | `Dio?` | Pre-configured Dio instance. A fresh one is created when omitted. |
+
+#### `EnsendClient.withAdapter({...})` — custom transport
+
+```dart
+final ensend = EnsendClient.withAdapter(
+  secret: 'your_project_secret',
+  adapter: myAdapter,                // required — your EnsendHttpAdapter
+  baseUrl: 'https://api.ensend.co',
+  timeout: Duration(seconds: 30),
+  enableLogging: false,
+);
+```
 
 ---
 
@@ -362,9 +461,79 @@ print(smtp.toMap());   // {"host": ..., "port": ..., "auth": {...}}
 
 ---
 
+## Logging
+
+The SDK uses [`package:logger`](https://pub.dev/packages/logger) for structured, levelled debug output.
+
+### Enable with default settings
+
+Pass `enableLogging: true` to either factory constructor. Logs are emitted using a `PrettyPrinter` with colour-coded levels, timestamps, and automatic suppression in Dart release/profile builds (via `DevelopmentFilter`):
+
+```dart
+final ensend = EnsendClient(
+  secret: 'sk_...',
+  enableLogging: true,
+);
+```
+
+Each outgoing request and response is printed to the console at **debug** / **info** level respectively. Errors are printed at **error** level with their stack trace. Base64 attachment content is automatically truncated to prevent megabyte-sized log output.
+
+Sample output:
+
+```
+💙 [EnsendSDK] → POST https://api.ensend.co/send/mail
+    {
+      "subject": "Welcome!",
+      "sender": { "address": "hello@acme.com" }
+    }
+💚 [EnsendSDK] ← 200
+    { "data": { "id": "msg_abc123" } }
+```
+
+### Inject a custom `Logger`
+
+Supply any `Logger` from `package:logger` to change the printer, filter, or output destination:
+
+```dart
+import 'package:logger/logger.dart';
+
+// Plain text output — great for structured log aggregators
+final ensend = EnsendClient(
+  secret: 'sk_...',
+  enableLogging: true,
+  logger: Logger(printer: SimplePrinter()),
+);
+
+// Write to a file
+final ensend = EnsendClient.withDio(
+  secret: 'sk_...',
+  enableLogging: true,
+  logger: Logger(
+    printer: SimplePrinter(),
+    output: FileOutput(file: File('ensend.log')),
+  ),
+);
+
+// Keep logs enabled in release builds (opt-in — use with care)
+final ensend = EnsendClient(
+  secret: 'sk_...',
+  enableLogging: true,
+  logger: Logger(
+    filter: ProductionFilter(),
+    printer: PrettyPrinter(methodCount: 0),
+  ),
+);
+```
+
+> The `logger` parameter has no effect when `enableLogging` is `false`. You must set both to see output.
+
+---
+
 ## Testing
 
-The SDK is built to be easily testable. Inject a mock `http.Client` to intercept all HTTP calls without hitting the network:
+### Approach 1 — inject a mock `http.Client`
+
+Use `mocktail` to stub the underlying `http.Client` without touching the network:
 
 ```dart
 import 'dart:convert';
@@ -414,7 +583,86 @@ void main() {
 }
 ```
 
-Run the SDK's own test suite:
+### Approach 2 — inject a mock `EnsendHttpAdapter`
+
+Mock the transport abstraction directly. This works for both the `package:http` and `package:dio` adapters and is the recommended approach for testing at the API layer:
+
+```dart
+import 'package:mocktail/mocktail.dart';
+import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:test/test.dart';
+
+class MockEnsendHttpAdapter extends Mock implements EnsendHttpAdapter {}
+
+void main() {
+  late MockEnsendHttpAdapter adapter;
+  late EnsendClient client;
+
+  setUp(() {
+    adapter = MockEnsendHttpAdapter();
+    client = EnsendClient.withAdapter(
+      secret: 'sk_test',
+      adapter: adapter,
+    );
+  });
+
+  test('sendMail delegates to adapter', () async {
+    when(() => adapter.post(any(), any()))
+        .thenAnswer((_) async => {'data': {'id': 'msg_1'}});
+
+    final result = await client.send.sendMail(
+      SendMailRequest(
+        subject: 'Test',
+        sender: EmailSender(address: 'test@acme.com'),
+        recipients: [EmailRecipient(address: 'user@example.com')],
+        message: 'Hello',
+      ),
+    );
+
+    expect(result.isSuccess, isTrue);
+    expect(result.data!['id'], 'msg_1');
+  });
+}
+```
+
+### Approach 3 — mock `Dio` for Dio-specific behaviour
+
+```dart
+import 'package:dio/dio.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:ensend_sdk/ensend_sdk.dart';
+import 'package:test/test.dart';
+
+class MockDio extends Mock implements Dio {}
+
+void main() {
+  test('DioEnsendHttpClient maps DioException to EnsendNetworkException', () async {
+    final mockDio = MockDio();
+    final client = EnsendClient.withDio(secret: 'sk_test', dio: mockDio);
+
+    when(() => mockDio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        )).thenThrow(DioException(
+      requestOptions: RequestOptions(path: '/send/mail'),
+      type: DioExceptionType.connectionError,
+    ));
+
+    expect(
+      () => client.send.sendMail(SendMailRequest(
+        subject: 'Test',
+        sender: EmailSender(address: 'test@acme.com'),
+        recipients: [EmailRecipient(address: 'user@example.com')],
+        message: 'Hello',
+      )),
+      throwsA(isA<EnsendNetworkException>()),
+    );
+  });
+}
+```
+
+Run the SDK's own test suite (77 tests, 0 warnings):
 
 ```sh
 dart test
